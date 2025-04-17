@@ -1,0 +1,69 @@
+# {{.Name}} (v{{.Version}})
+
+This is a custom language implementation with support for functions, variables, and various data types.
+
+## Data Types
+
+The language supports the following data types:
+
+- `int`: Integer values
+- `float`: Floating-point values
+- `string`: Text values (enclosed in double quotes)
+- `bool`: Boolean values (`true` or `false`)
+
+## Syntax
+
+### Comments
+Comments start and end with `#`. Linebreaks are treated as part of the comment. In comments `#` can be escaped with `\`.
+
+### String Literals
+Strings start and end with `"`. Linebreaks are treated as part of the string. In strings `"` can be escaped with `\`.
+
+### Argument References
+Script arguments can be referenced using `$1`, `$2`, etc.
+
+### Variables
+
+Variables can be declared and assigned using the `:` operator:
+
+`myVar: 42`
+
+`text: "Hello World"`
+
+### Functions
+
+Functions are called using the syntax `functionName(arg1 arg2 ...)`.
+
+Arguments can be passed by position or by name.
+You must either use positional arguments or named arguments, mixing is not allowed.
+All arguments have defaults.
+
+{{if .Variables}}
+## Variables
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+{{range .Variables -}}
+| `{{.Name}}` | `{{.Type}}` | {{if not (eq .Default nil)}}{{if eq .Type "string"}}`"{{.Default}}"`{{else}}`{{.Default}}`{{end}}{{else}} {{end}} | {{.Description}} |
+{{end}}
+{{end}}
+
+{{if .Functions}}
+## Functions
+
+{{range .Functions -}}
+### `{{.Name}}({{range $i, $p := .Params}}{{if $i}} {{end}}{{$p.Name}}={{if eq $p.Type "string"}}"{{$p.Default}}"{{else}}{{$p.Default}}{{end}}{{end}}){{if .Returns}} ⮕ ({{range $i, $r := .Returns}}{{if $i}} {{end}}{{$r.Name}}={{if eq $r.Type "string"}}"{{$r.Default}}"{{else}}{{$r.Default}}{{end}}{{end}}){{end}}`  
+_{{.Description}}_
+{{if or .Params .Returns}}
+| Name | Type | Default | Min | Max | Unit | Description |
+|------|------|---------|-----|-----|------|-------------|
+{{range .Params -}}
+| `{{.Name}}` | `{{.Type}}` | {{if not (eq .Default nil)}}{{if eq .Type "string"}}`"{{.Default}}"`{{else}}`{{.Default}}`{{end}}{{else}} {{end}} | {{if not (eq .Min nil)}}`{{.Min}}`{{else}} {{end}} | {{if not (eq .Max nil)}}`{{.Max}}`{{else}} {{end}} | {{if .Unit}}`{{.Unit}}`{{else}} {{end}} | {{.Description}} |
+{{end -}}
+{{range .Returns -}}
+| `⮕ {{.Name}}` | `{{.Type}}` | {{if not (eq .Default nil)}}{{if eq .Type "string"}}`"{{.Default}}"`{{else}}`{{.Default}}`{{end}}{{else}} {{end}} | {{if not (eq .Min nil)}}`{{.Min}}`{{else}} {{end}} | {{if not (eq .Max nil)}}`{{.Max}}`{{else}} {{end}} | {{if .Unit}}`{{.Unit}}`{{else}} {{end}} | {{.Description}} |
+{{end -}}
+---
+{{end}}
+{{end}} 
+{{end}} 

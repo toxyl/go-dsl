@@ -1,0 +1,41 @@
+# Welcome to the {{.Name}} v{{.Version}} Shell!
+
+## Basic Usage 
+| Example | Description |
+|---------|-------------|
+| `add(1 sub(2 3))` | Subtract 3 from 2 and add 1
+| `add(last 1)` | Add 1 to the last result
+| `a: 100` | Create `a` and set to 100
+| `b: add(100 a)` | Create `b` and set to 100+`a` (i.e. 200)
+
+{{if .Functions}}
+## Functions
+| Name | Description |  
+|------|-------------|
+{{range .Functions }}| `{{.Name}}({{range $i, $p := .Params}}{{if $i}} {{end}}{{$p.Name}}={{if eq $p.Type "string"}}"{{$p.Default}}"{{else}}{{$p.Default}}{{end}}{{end}})` | {{.Description}} |
+{{end}}
+{{end}}
+
+{{if .Variables}}
+## Variables
+| Name | Description |
+|------|-------------|
+{{range .Variables }}| `{{.Name}}` | {{.Description}} |
+{{end}}
+{{end}}
+## Commands
+| Command | Description |
+|---------|-------------|
+| `store` | Store current state of variables |
+| `restore` | Restore previous state of variables |
+| `export-md` | Export documentation as Markdown |
+| `export-html` | Export documentation as HTML |
+| `export-vscode-extension` | Export VSCode extension |
+| `search [term]` | Search documentation for a variable/function |
+| `debug` | Toggle debug mode |
+| `help` | Show full documentation |
+| `?` | Show this screen |
+
+`TAB` `TAB` to autocomplete variables and functions.
+
+Type `exit` or press `CTRL+D` to quit

@@ -1,0 +1,28 @@
+
+{{if .Found}}
+{{if .Variables}}
+# Variables containing "{{.Query}}"
+{{range .Variables}}`{{.Name}}{{if ne .Default nil}}={{.Default}}{{end}}` `({{.Type}})`{{if .Description}} {{.Description}}
+{{end}}
+{{end}}
+{{end}}
+{{if .Functions}}
+# Functions containing "{{.Query}}"
+
+{{range .Functions}}
+`{{.Name}}({{range $i, $p := .Parameters}}{{if $i}} {{end}}{{$p.Name}}={{if ne $p.Default nil}}{{if eq $p.Type "string"}}"{{$p.Default}}"{{else}}{{$p.Default}}{{end}}{{end}}{{end}})`{{if .Description}} _{{.Description}}_
+{{end}}
+{{ if or .Parameters .Returns}}
+| Name | Type | Default | Min | Max | Unit | Description |
+| ---- | ---- | ------- | --- | --- | ---- | ----------- |
+{{if .Parameters}}{{range .Parameters}}| `{{.Name}}` | `{{.Type}}` | {{if ne .Default nil}}{{if eq .Type "string"}}`"{{.Default}}"`{{else}}`{{.Default}}`{{end}}{{else}} {{end}} | {{if ne .Min nil}}`{{.Min}}`{{else}} {{end}} | {{if ne .Max nil}}`{{.Max}}`{{else}} {{end}} | {{if .Unit}}`{{.Unit}}`{{else}} {{end}} | {{if .Description}}{{.Description}}{{end}} |
+{{end}}{{end}}| **returns** |  |  |  |  |  |  |
+{{if .Returns}}{{range .Returns}}| `{{.Name}}` | `{{.Type}}` | {{if ne .Default nil}}{{if eq .Type "string"}}`"{{.Default}}"`{{else}}`{{.Default}}`{{end}}{{else}} {{end}} | {{if ne .Min nil}}`{{.Min}}`{{else}} {{end}} | {{if ne .Max nil}}`{{.Max}}`{{else}} {{end}} | {{if .Unit}}`{{.Unit}}`{{else}} {{end}} | {{if .Description}}{{.Description}}{{end}} |
+{{end}}
+---{{end}}
+{{end}}
+{{end}}
+{{end}}
+{{else}}
+No variables or functions found matching '{{.Query}}'
+{{end}} 

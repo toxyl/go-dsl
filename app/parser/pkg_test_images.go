@@ -8,6 +8,11 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"path/filepath"
+)
+
+const (
+	imageTestOutputDir = "test_output/test_images" // Combined path for all test image outputs
 )
 
 // GenerateTestImages creates a set of test images for blend mode and filter testing
@@ -15,7 +20,7 @@ func GenerateTestImages() error {
 	dsl := &dslCollection{}
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll("test_images", 0755); err != nil {
+	if err := os.MkdirAll(imageTestOutputDir, 0755); err != nil {
 		return err
 	}
 
@@ -54,7 +59,7 @@ func GenerateTestImages() error {
 	}
 
 	for _, ti := range testImages {
-		file, err := os.Create(fmt.Sprintf("test_images/%s.png", ti.name))
+		file, err := os.Create(filepath.Join(imageTestOutputDir, fmt.Sprintf("%s.png", ti.name)))
 		if err != nil {
 			return err
 		}
@@ -212,7 +217,7 @@ func hueToRGB(p, q, t float64) float64 {
 
 // saveImage saves an image to a file
 func saveImage(img image.Image, filename string) error {
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Join(imageTestOutputDir, filepath.Base(filename)))
 	if err != nil {
 		return err
 	}

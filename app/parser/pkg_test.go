@@ -15,6 +15,17 @@ import (
 	"github.com/toxyl/flo"
 )
 
+const (
+	testOutputDir = "test_output"
+)
+
+func init() {
+	// Create test output directory if it doesn't exist
+	if err := os.MkdirAll(testOutputDir, 0755); err != nil {
+		panic(fmt.Sprintf("Failed to create test output directory: %v", err))
+	}
+}
+
 func createTestLanguage() {
 	pos := 0
 	isEnabled := false
@@ -129,7 +140,7 @@ func createTestLanguage() {
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA64", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.NRGBA64)
-			file, err := os.Create("../../LANGUAGE-NRGBA64.png")
+			file, err := os.Create(filepath.Join(testOutputDir, "LANGUAGE-NRGBA64.png"))
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +154,7 @@ func createTestLanguage() {
 		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.RGBA64)
-			file, err := os.Create("../../LANGUAGE-RGBA64.png")
+			file, err := os.Create(filepath.Join(testOutputDir, "LANGUAGE-RGBA64.png"))
 			if err != nil {
 				return nil, err
 			}
@@ -157,7 +168,7 @@ func createTestLanguage() {
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.NRGBA)
-			file, err := os.Create("../../LANGUAGE-NRGBA64-NRGBA.png")
+			file, err := os.Create(filepath.Join(testOutputDir, "LANGUAGE-NRGBA64-NRGBA.png"))
 			if err != nil {
 				return nil, err
 			}
@@ -171,7 +182,7 @@ func createTestLanguage() {
 		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.RGBA)
-			file, err := os.Create("../../LANGUAGE-RGBA64-RGBA.png")
+			file, err := os.Create(filepath.Join(testOutputDir, "LANGUAGE-RGBA64-RGBA.png"))
 			if err != nil {
 				return nil, err
 			}

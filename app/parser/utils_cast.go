@@ -18,6 +18,21 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 
 	// Validate input type
 	switch value.(type) {
+	case *image.NRGBA:
+		if targetType != "*image.NRGBA" {
+			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.NRGBA", targetType)
+		}
+		return value, nil
+	case *image.RGBA:
+		if targetType != "*image.RGBA" {
+			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.RGBA", targetType)
+		}
+		return value, nil
+	case *image.RGBA64:
+		if targetType != "*image.RGBA64" {
+			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.RGBA64", targetType)
+		}
+		return value, nil
 	case *image.NRGBA64:
 		if targetType != "*image.NRGBA64" {
 			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.NRGBA64", targetType)

@@ -1417,10 +1417,6 @@ func TestParser(t *testing.T) {
 }
 
 func TestImageProcessing(t *testing.T) {
-	if err := GenerateTestImages(); err != nil {
-		t.Errorf("Failed to generate test images: %v", err)
-	}
-
 	// Helper function to process an image through all filters
 	processImageWithAllFilters := func(t *testing.T, inputPath string) {
 		// Create a fresh DSL instance for each test
@@ -1448,7 +1444,7 @@ func TestImageProcessing(t *testing.T) {
 		// Process basic filters
 		for _, filter := range filters {
 			dsl.restoreState() // Restore clean state for each test
-			outputPath := fmt.Sprintf("../../%s-%s.png", nameWithoutExt, filter.name)
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s.png", nameWithoutExt, filter.name))
 			script := fmt.Sprintf(filter.script, inputPath, outputPath)
 			_, err := dsl.run(script, false)
 			if err != nil {
@@ -1473,7 +1469,7 @@ func TestImageProcessing(t *testing.T) {
 		// Process combinations
 		for _, combo := range combinations {
 			dsl.restoreState() // Restore clean state for each test
-			outputPath := fmt.Sprintf("../../%s-%s.png", nameWithoutExt, combo.name)
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s.png", nameWithoutExt, combo.name))
 			script := fmt.Sprintf(combo.script, inputPath, outputPath)
 			_, err := dsl.run(script, false)
 			if err != nil {
@@ -1493,7 +1489,7 @@ func TestImageProcessing(t *testing.T) {
 		// Process error cases
 		for _, errCase := range errorCases {
 			dsl.restoreState() // Restore clean state for each test
-			outputPath := fmt.Sprintf("../../%s-%s-error.png", nameWithoutExt, errCase.name)
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s-error.png", nameWithoutExt, errCase.name))
 			script := fmt.Sprintf(errCase.script, inputPath, outputPath)
 			_, err := dsl.run(script, false)
 			if err == nil {
@@ -1503,17 +1499,21 @@ func TestImageProcessing(t *testing.T) {
 	}
 
 	t.Run("Comprehensive Filter Tests", func(t *testing.T) {
+		// First ensure test images are generated
+		if err := GenerateTestImages(); err != nil {
+			t.Fatalf("Failed to generate test images: %v", err)
+		}
+
 		// Read all test images from the directory
-		testImagesDir := "test_images"
-		entries, err := os.ReadDir(testImagesDir)
+		entries, err := os.ReadDir(imageTestOutputDir)
 		if err != nil {
-			t.Fatalf("Failed to read test_images directory: %v", err)
+			t.Fatalf("Failed to read test images directory: %v", err)
 		}
 
 		// Process each test image
 		for _, entry := range entries {
 			if !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".png") {
-				inputPath := filepath.Join(testImagesDir, entry.Name())
+				inputPath := filepath.Join(imageTestOutputDir, entry.Name())
 				t.Run(entry.Name(), func(t *testing.T) {
 					processImageWithAllFilters(t, inputPath)
 				})

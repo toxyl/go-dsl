@@ -29,7 +29,7 @@ After copying the base files, GoDSL generates a `dsl_init.go` file containing an
 
 - Parse nested function calls and expressions
 - Support named and positional arguments
-- Validate and convert int, float, bool, and string types
+- Validate and convert int, float, bool, string, and image types
 - Handle optional parameters with defaults
 - Manage global variables
 - Visualize AST trees in debug mode
@@ -38,6 +38,17 @@ After copying the base files, GoDSL generates a `dsl_init.go` file containing an
 - Handle escaped characters in strings and comments
 - Flexible expression whitespace
 - Detailed error reporting
+- Image processing capabilities:
+  - Support for RGBA and NRGBA image formats
+  - Proper transparency handling with alpha channel support
+  - Pre-multiplied alpha support for correct blending
+  - Comprehensive test suite for image operations including:
+    - Test image generators for validation:
+      - Gradient patterns with alpha transitions
+      - Checkerboard patterns with alternating transparency
+      - Color wheels with radial transparency
+      - Noise patterns with random transparency
+      - Color bands and edge case test patterns
 
 ## Syntax
 
@@ -65,6 +76,7 @@ The parser supports a set of basic types to handle different kinds of data:
 - **Float**: Decimal numbers like `3.14` for precise calculations and measurements
 - **Boolean**: Logical values `true` and `false` for conditional operations
 - **String**: Text values enclosed in `"` characters, like `"hello \"world"`. You can escape the `"` character using `\"` if needed
+- **Image**: Image data in RGBA/RGBA64 or NRGBA/NRGBA64 format, supporting 8-bit and 16-bit color depths with full alpha channel transparency
 
 ## Error Handling
 
@@ -137,6 +149,10 @@ When defining functions for your DSL, keep these requirements in mind:
   - `uint*` (any unsigned integer type)
   - `bool`
   - `string`
+  - `*image.RGBA` (8-bit RGBA image type)
+  - `*image.NRGBA` (8-bit non-premultiplied RGBA image type)
+  - `*image.RGBA64` (16-bit RGBA image type)
+  - `*image.NRGBA64` (16-bit non-premultiplied RGBA image type)
 
 Each function must be annotated with the following information:
 - **@Name**: The function's name

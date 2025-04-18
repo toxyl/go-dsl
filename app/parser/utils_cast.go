@@ -18,26 +18,8 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 
 	// Validate input type
 	switch value.(type) {
-	case *image.NRGBA:
-		if targetType != "*image.NRGBA" {
-			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.NRGBA", targetType)
-		}
-		return value, nil
-	case *image.RGBA:
-		if targetType != "*image.RGBA" {
-			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.RGBA", targetType)
-		}
-		return value, nil
-	case *image.RGBA64:
-		if targetType != "*image.RGBA64" {
-			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.RGBA64", targetType)
-		}
-		return value, nil
-	case *image.NRGBA64:
-		if targetType != "*image.NRGBA64" {
-			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.NRGBA64", targetType)
-		}
-		return value, nil
+	case *image.NRGBA, *image.RGBA, *image.RGBA64, *image.NRGBA64:
+		return dsl.castImage(value, targetType)
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
 		// These types are supported
 	default:
@@ -348,4 +330,86 @@ func (dsl *dslCollection) castToType(value any, targetType string) (any, error) 
 		}
 	}
 	return nil, dsl.errors.UNSUPPORTED_TARGET_TYPE(targetType)
+}
+
+// castImage handles conversions between different image types
+func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
+	switch v := value.(type) {
+	case *image.NRGBA:
+		switch targetType {
+		case "*image.NRGBA":
+			return v, nil
+		case "*image.RGBA":
+			return dsl.convertNRGBAToRGBA(v), nil
+		}
+	case *image.RGBA:
+		switch targetType {
+		case "*image.NRGBA":
+			return dsl.convertRGBAToNRGBA(v), nil
+		case "*image.RGBA":
+			return v, nil
+		}
+	case *image.RGBA64:
+		switch targetType {
+		case "*image.RGBA64":
+			return v, nil
+		case "*image.NRGBA64":
+			return dsl.convertRGBA64ToNRGBA64(v), nil
+		}
+	case *image.NRGBA64:
+		switch targetType {
+		case "*image.RGBA64":
+			return dsl.convertNRGBA64ToRGBA64(v), nil
+		case "*image.NRGBA64":
+			return v, nil
+		}
+	}
+	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+}
+
+// Helper functions for image conversions
+func (dsl *dslCollection) convertNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
+	bounds := src.Bounds()
+	dst := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			i := dst.PixOffset(x, y)
+			j := src.PixOffset(x, y)
+			dst.Pix[i+0] = src.Pix[j+0]
+			dst.Pix[i+1] = src.Pix[j+1]
+			dst.Pix[i+2] = src.Pix[j+2]
+			dst.Pix[i+3] = src.Pix[j+3]
+		}
+	}
+	return dst
+}
+
+func (dsl *dslCollection) convertRGBAToNRGBA(src *image.RGBA) *image.NRGBA {
+	bounds := src.Bounds()
+	dst := image.NewNRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			i := dst.PixOffset(x, y)
+			j := src.PixOffset(x, y)
+			dst.Pix[i+0] = src.Pix[j+0]
+			dst.Pix[i+1] = src.Pix[j+1]
+			dst.Pix[i+2] = src.Pix[j+2]
+			dst.Pix[i+3] = src.Pix[j+3]
+		}
+	}
+	return dst
+}
+
+func (dsl *dslCollection) convertRGBA64ToNRGBA64(src *image.RGBA64) *image.NRGBA64 {
+	bounds := src.Bounds()
+	dst := image.NewNRGBA64(bounds)
+	copy(dst.Pix, src.Pix)
+	return dst
+}
+
+func (dsl *dslCollection) convertNRGBA64ToRGBA64(src *image.NRGBA64) *image.RGBA64 {
+	bounds := src.Bounds()
+	dst := image.NewRGBA64(bounds)
+	copy(dst.Pix, src.Pix)
+	return dst
 }

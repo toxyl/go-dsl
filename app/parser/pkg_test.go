@@ -152,10 +152,10 @@ func createTestLanguage() {
 		},
 	)
 	dsl.funcs.register("img-nrgba", "This is a function to process an NRGBA image",
-		[]dslParamMeta{{name: "img", typ: "*image.NRGBA64", desc: "The image to process"}},
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The image with a pixel colored red"}},
 		func(a ...any) (any, error) {
-			img := a[0].(*image.NRGBA64)
+			img := a[0].(*image.NRGBA)
 			file, err := os.Create("../../LANGUAGE-NRGBA64-NRGBA.png")
 			if err != nil {
 				return nil, err
@@ -166,10 +166,10 @@ func createTestLanguage() {
 		},
 	)
 	dsl.funcs.register("img-rgba", "This is another function to process an RGBA image",
-		[]dslParamMeta{{name: "img", typ: "*image.RGBA64", desc: "The image to process"}},
+		[]dslParamMeta{{name: "img", typ: "*image.RGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The image with a pixel colored red"}},
 		func(a ...any) (any, error) {
-			img := a[0].(*image.RGBA64)
+			img := a[0].(*image.RGBA)
 			file, err := os.Create("../../LANGUAGE-RGBA64-RGBA.png")
 			if err != nil {
 				return nil, err
@@ -1036,6 +1036,8 @@ func TestParser(t *testing.T) {
 		}
 		imgNRGBA64 := image.NewNRGBA64(image.Rect(0, 0, 100, 100))
 		imgRGBA64 := image.NewRGBA64(image.Rect(0, 0, 100, 100))
+		imgNRGBA := image.NewNRGBA(image.Rect(0, 0, 100, 100))
+		imgRGBA := image.NewRGBA(image.Rect(0, 0, 100, 100))
 		tests := []TestCase{
 			c("empty string as named argument", `test-function-1(str="")`, []any{}, &dslResult{0, nil}, false),
 			c("argument out of range", `$3`, []any{1, 2}, &dslResult{nil, fmt.Errorf("argument $3 out of range")}, true),
@@ -1063,6 +1065,10 @@ func TestParser(t *testing.T) {
 			c("image processing (RGBA64-NRGBA64)", `img-nrgba64($1)`, []any{imgRGBA64}, &dslResult{imgNRGBA64, nil}, false),
 			c("image processing (NRGBA64-RGBA64)", `img-rgba64($1)`, []any{imgNRGBA64}, &dslResult{imgRGBA64, nil}, false),
 			c("image processing (NRGBA64-NRGBA64)", `img-nrgba64($1)`, []any{imgNRGBA64}, &dslResult{imgNRGBA64, nil}, false),
+			c("image processing (RGBA-RGBA)", `img-rgba($1)`, []any{imgRGBA}, &dslResult{imgRGBA, nil}, false),
+			c("image processing (RGBA-NRGBA)", `img-nrgba($1)`, []any{imgRGBA}, &dslResult{imgNRGBA, nil}, false),
+			c("image processing (NRGBA-RGBA)", `img-rgba($1)`, []any{imgNRGBA}, &dslResult{imgRGBA, nil}, false),
+			c("image processing (NRGBA-NRGBA)", `img-nrgba($1)`, []any{imgNRGBA}, &dslResult{imgNRGBA, nil}, false),
 		}
 
 		createTestLanguage()

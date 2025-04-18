@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"reflect"
 	"strconv"
 	"strings"
@@ -373,12 +374,14 @@ func (dsl *dslCollection) convertNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
 	dst := image.NewRGBA(bounds)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			i := dst.PixOffset(x, y)
-			j := src.PixOffset(x, y)
-			dst.Pix[i+0] = src.Pix[j+0]
-			dst.Pix[i+1] = src.Pix[j+1]
-			dst.Pix[i+2] = src.Pix[j+2]
-			dst.Pix[i+3] = src.Pix[j+3]
+			c := src.NRGBAAt(x, y)
+			// Convert to premultiplied alpha
+			dst.Set(x, y, color.RGBA{
+				R: uint8(uint32(c.R) * uint32(c.A) / 255),
+				G: uint8(uint32(c.G) * uint32(c.A) / 255),
+				B: uint8(uint32(c.B) * uint32(c.A) / 255),
+				A: c.A,
+			})
 		}
 	}
 	return dst
@@ -389,12 +392,18 @@ func (dsl *dslCollection) convertRGBAToNRGBA(src *image.RGBA) *image.NRGBA {
 	dst := image.NewNRGBA(bounds)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			i := dst.PixOffset(x, y)
-			j := src.PixOffset(x, y)
-			dst.Pix[i+0] = src.Pix[j+0]
-			dst.Pix[i+1] = src.Pix[j+1]
-			dst.Pix[i+2] = src.Pix[j+2]
-			dst.Pix[i+3] = src.Pix[j+3]
+			c := src.RGBAAt(x, y)
+			if c.A == 0 {
+				dst.Set(x, y, color.NRGBA{0, 0, 0, 0})
+				continue
+			}
+			// Convert from premultiplied to non-premultiplied alpha
+			dst.Set(x, y, color.NRGBA{
+				R: uint8(uint32(c.R) * 255 / uint32(c.A)),
+				G: uint8(uint32(c.G) * 255 / uint32(c.A)),
+				B: uint8(uint32(c.B) * 255 / uint32(c.A)),
+				A: c.A,
+			})
 		}
 	}
 	return dst

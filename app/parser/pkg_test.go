@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -125,7 +126,7 @@ func createTestLanguage() {
 	)
 	dsl.funcs.register("img-nrgba64", "This is a function to process an NRGBA64 image",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA64", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.NRGBA64", def: false, desc: "The image with a pixel colored red"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA64", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.NRGBA64)
 			file, err := os.Create("../../LANGUAGE-NRGBA64.png")
@@ -139,7 +140,7 @@ func createTestLanguage() {
 	)
 	dsl.funcs.register("img-rgba64", "This is another function to process an RGBA64 image",
 		[]dslParamMeta{{name: "img", typ: "*image.RGBA64", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The image with a pixel colored red"}},
+		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.RGBA64)
 			file, err := os.Create("../../LANGUAGE-RGBA64.png")
@@ -153,7 +154,7 @@ func createTestLanguage() {
 	)
 	dsl.funcs.register("img-nrgba", "This is a function to process an NRGBA image",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The image with a pixel colored red"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.NRGBA)
 			file, err := os.Create("../../LANGUAGE-NRGBA64-NRGBA.png")
@@ -167,7 +168,7 @@ func createTestLanguage() {
 	)
 	dsl.funcs.register("img-rgba", "This is another function to process an RGBA image",
 		[]dslParamMeta{{name: "img", typ: "*image.RGBA", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The image with a pixel colored red"}},
+		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
 			img := a[0].(*image.RGBA)
 			file, err := os.Create("../../LANGUAGE-RGBA64-RGBA.png")
@@ -177,6 +178,323 @@ func createTestLanguage() {
 			defer file.Close()
 			png.Encode(file, img)
 			return img, nil
+		},
+	)
+	dsl.funcs.register("load", "This is a function to load RGBA images",
+		[]dslParamMeta{{name: "src", typ: "string", desc: "The image file to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The image"}},
+		func(a ...any) (any, error) {
+			path := a[0].(string)
+			file, err := os.Open(path)
+			if err != nil {
+				return nil, err
+			}
+			defer file.Close()
+
+			img, err := png.Decode(file)
+			if err != nil {
+				return nil, err
+			}
+
+			// Try to get as NRGBA first
+			if nrgba, ok := img.(*image.NRGBA); ok {
+				return nrgba, nil
+			}
+
+			// If it's RGBA, convert it to NRGBA
+			if rgba, ok := img.(*image.RGBA); ok {
+				return dsl.convertRGBAToNRGBA(rgba), nil
+			}
+
+			// If we get here, the image is neither RGBA nor NRGBA
+			return nil, fmt.Errorf("unsupported image format: %T (must be NRGBA or RGBA)", img)
+		},
+	)
+	dsl.funcs.register("save", "This is a function to save RGBA images",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to save"}, {name: "path", typ: "string", desc: "The file to write to"}},
+		[]dslParamMeta{{name: "res", typ: "bool", def: false, desc: "Whether saving was successful"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			path := a[1].(string)
+			file, err := os.Create(path)
+			if err != nil {
+				return nil, err
+			}
+			defer file.Close()
+			png.Encode(file, img)
+			return img, nil
+		},
+	)
+	dsl.funcs.register("invert", "Inverts the image",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The inverted image"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			bounds := img.Bounds()
+			inverted := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.NRGBAAt(x, y)
+					inverted.Set(x, y, color.NRGBA{
+						R: 255 - c.R,
+						G: 255 - c.G,
+						B: 255 - c.B,
+						A: c.A, // Keep original alpha
+					})
+				}
+			}
+			return inverted, nil
+		},
+	)
+	dsl.funcs.register("grayscale", "Converts the image to grayscale",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The grayscale image"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			bounds := img.Bounds()
+			grayscaled := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.NRGBAAt(x, y)
+					// Using luminosity method: 0.21 R + 0.72 G + 0.07 B
+					gray := uint8(float64(c.R)*0.21 + float64(c.G)*0.72 + float64(c.B)*0.07)
+					grayscaled.Set(x, y, color.NRGBA{
+						R: gray,
+						G: gray,
+						B: gray,
+						A: c.A,
+					})
+				}
+			}
+			return grayscaled, nil
+		},
+	)
+	dsl.funcs.register("brightness", "Adjusts the brightness of the image",
+		[]dslParamMeta{
+			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
+			{name: "factor", typ: "float64", desc: "Brightness adjustment factor (0.0 to 2.0, 1.0 is original)"},
+		},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The brightness-adjusted image"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			factor := a[1].(float64)
+
+			if factor < 0.0 || factor > 2.0 {
+				return nil, fmt.Errorf("brightness factor must be between 0.0 and 2.0")
+			}
+
+			bounds := img.Bounds()
+			adjusted := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.NRGBAAt(x, y)
+					adjusted.Set(x, y, color.NRGBA{
+						R: uint8(math.Min(float64(c.R)*factor, 255)),
+						G: uint8(math.Min(float64(c.G)*factor, 255)),
+						B: uint8(math.Min(float64(c.B)*factor, 255)),
+						A: c.A,
+					})
+				}
+			}
+			return adjusted, nil
+		},
+	)
+	dsl.funcs.register("sepia", "Applies a sepia tone effect to the image",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The sepia-toned image"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			bounds := img.Bounds()
+			sepia := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.NRGBAAt(x, y)
+					r := float64(c.R)
+					g := float64(c.G)
+					b := float64(c.B)
+
+					newR := uint8(math.Min((r*0.393)+(g*0.769)+(b*0.189), 255))
+					newG := uint8(math.Min((r*0.349)+(g*0.686)+(b*0.168), 255))
+					newB := uint8(math.Min((r*0.272)+(g*0.534)+(b*0.131), 255))
+
+					sepia.Set(x, y, color.NRGBA{
+						R: newR,
+						G: newG,
+						B: newB,
+						A: c.A,
+					})
+				}
+			}
+			return sepia, nil
+		},
+	)
+	dsl.funcs.register("blur", "Applies a simple box blur to the image",
+		[]dslParamMeta{
+			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
+			{name: "radius", typ: "int", desc: "Blur radius (1-10)"},
+		},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The blurred image"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			radius := a[1].(int)
+
+			if radius < 1 || radius > 10 {
+				return nil, fmt.Errorf("blur radius must be between 1 and 10")
+			}
+
+			bounds := img.Bounds()
+			blurred := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					var rSum, gSum, bSum, aSum, count float64
+
+					for dy := -radius; dy <= radius; dy++ {
+						for dx := -radius; dx <= radius; dx++ {
+							nx, ny := x+dx, y+dy
+							if nx >= bounds.Min.X && nx < bounds.Max.X && ny >= bounds.Min.Y && ny < bounds.Max.Y {
+								c := img.NRGBAAt(nx, ny)
+								rSum += float64(c.R)
+								gSum += float64(c.G)
+								bSum += float64(c.B)
+								aSum += float64(c.A)
+								count++
+							}
+						}
+					}
+
+					blurred.Set(x, y, color.NRGBA{
+						R: uint8(rSum / count),
+						G: uint8(gSum / count),
+						B: uint8(bSum / count),
+						A: uint8(aSum / count),
+					})
+				}
+			}
+			return blurred, nil
+		},
+	)
+	dsl.funcs.register("debug-alpha", "Visualizes the alpha channel as grayscale",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The alpha visualization"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			bounds := img.Bounds()
+			debug := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.NRGBAAt(x, y)
+					debug.Set(x, y, color.NRGBA{
+						R: c.A,
+						G: c.A,
+						B: c.A,
+						A: 255,
+					})
+				}
+			}
+			return debug, nil
+		},
+	)
+	dsl.funcs.register("debug-channels", "Visualizes each color channel separately",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The channel visualization"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			bounds := img.Bounds()
+			debug := image.NewNRGBA(bounds)
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.NRGBAAt(x, y)
+					// R channel in red, G in green, B in blue
+					debug.Set(x, y, color.NRGBA{
+						R: c.R,
+						G: c.G,
+						B: c.B,
+						A: 255,
+					})
+				}
+			}
+			return debug, nil
+		},
+	)
+	dsl.funcs.register("debug-bounds", "Highlights the image bounds and center",
+		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The bounds visualization"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			bounds := img.Bounds()
+			debug := image.NewNRGBA(bounds)
+
+			// Copy original image
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					debug.Set(x, y, img.NRGBAAt(x, y))
+				}
+			}
+
+			// Draw bounds
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				debug.Set(x, bounds.Min.Y, color.NRGBA{255, 0, 0, 255})   // Top
+				debug.Set(x, bounds.Max.Y-1, color.NRGBA{255, 0, 0, 255}) // Bottom
+			}
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				debug.Set(bounds.Min.X, y, color.NRGBA{255, 0, 0, 255})   // Left
+				debug.Set(bounds.Max.X-1, y, color.NRGBA{255, 0, 0, 255}) // Right
+			}
+
+			// Draw center cross
+			centerX := (bounds.Min.X + bounds.Max.X) / 2
+			centerY := (bounds.Min.Y + bounds.Max.Y) / 2
+			for i := -5; i <= 5; i++ {
+				if centerX+i >= bounds.Min.X && centerX+i < bounds.Max.X {
+					debug.Set(centerX+i, centerY, color.NRGBA{0, 255, 0, 255})
+				}
+				if centerY+i >= bounds.Min.Y && centerY+i < bounds.Max.Y {
+					debug.Set(centerX, centerY+i, color.NRGBA{0, 255, 0, 255})
+				}
+			}
+
+			return debug, nil
+		},
+	)
+	dsl.funcs.register("debug-grid", "Overlays a grid on the image",
+		[]dslParamMeta{
+			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
+			{name: "size", typ: "int", desc: "Grid size in pixels"},
+		},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The grid visualization"}},
+		func(a ...any) (any, error) {
+			img := a[0].(*image.NRGBA)
+			gridSize := a[1].(int)
+			bounds := img.Bounds()
+			debug := image.NewNRGBA(bounds)
+
+			// Copy original image
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					debug.Set(x, y, img.NRGBAAt(x, y))
+				}
+			}
+
+			// Draw grid
+			for y := bounds.Min.Y; y < bounds.Max.Y; y += gridSize {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					debug.Set(x, y, color.NRGBA{0, 0, 0, 128})
+				}
+			}
+			for x := bounds.Min.X; x < bounds.Max.X; x += gridSize {
+				for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+					debug.Set(x, y, color.NRGBA{0, 0, 0, 128})
+				}
+			}
+
+			return debug, nil
 		},
 	)
 	dsl.storeState()
@@ -1034,10 +1352,6 @@ func TestParser(t *testing.T) {
 		c := func(name string, script string, args []any, want *dslResult, wantErr bool) TestCase {
 			return TestCase{name, script, args, want, wantErr}
 		}
-		imgNRGBA64 := image.NewNRGBA64(image.Rect(0, 0, 100, 100))
-		imgRGBA64 := image.NewRGBA64(image.Rect(0, 0, 100, 100))
-		imgNRGBA := image.NewNRGBA(image.Rect(0, 0, 100, 100))
-		imgRGBA := image.NewRGBA(image.Rect(0, 0, 100, 100))
 		tests := []TestCase{
 			c("empty string as named argument", `test-function-1(str="")`, []any{}, &dslResult{0, nil}, false),
 			c("argument out of range", `$3`, []any{1, 2}, &dslResult{nil, fmt.Errorf("argument $3 out of range")}, true),
@@ -1061,14 +1375,6 @@ func TestParser(t *testing.T) {
 			c("optional arguments with defaults 2", `test-function-1(1)`, []any{}, &dslResult{1, nil}, false),
 			c("optional arguments with defaults 3", `test-function-1()`, []any{}, &dslResult{0, nil}, false),
 			c("simple function call", `test-function-1(1 2 "hello \" mean\"world!\"")`, []any{}, &dslResult{3, nil}, false),
-			c("image processing (RGBA64-RGBA64)", `img-rgba64($1)`, []any{imgRGBA64}, &dslResult{imgRGBA64, nil}, false),
-			c("image processing (RGBA64-NRGBA64)", `img-nrgba64($1)`, []any{imgRGBA64}, &dslResult{imgNRGBA64, nil}, false),
-			c("image processing (NRGBA64-RGBA64)", `img-rgba64($1)`, []any{imgNRGBA64}, &dslResult{imgRGBA64, nil}, false),
-			c("image processing (NRGBA64-NRGBA64)", `img-nrgba64($1)`, []any{imgNRGBA64}, &dslResult{imgNRGBA64, nil}, false),
-			c("image processing (RGBA-RGBA)", `img-rgba($1)`, []any{imgRGBA}, &dslResult{imgRGBA, nil}, false),
-			c("image processing (RGBA-NRGBA)", `img-nrgba($1)`, []any{imgRGBA}, &dslResult{imgNRGBA, nil}, false),
-			c("image processing (NRGBA-RGBA)", `img-rgba($1)`, []any{imgNRGBA}, &dslResult{imgRGBA, nil}, false),
-			c("image processing (NRGBA-NRGBA)", `img-nrgba($1)`, []any{imgNRGBA}, &dslResult{imgNRGBA, nil}, false),
 		}
 
 		createTestLanguage()
@@ -1095,6 +1401,112 @@ func TestParser(t *testing.T) {
 				got, err := dsl.run(tt.script, false, tt.args...)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
+		}
+	})
+}
+
+func TestImageProcessing(t *testing.T) {
+	if err := GenerateTestImages(); err != nil {
+		t.Errorf("Failed to generate test images: %v", err)
+	}
+
+	// Helper function to process an image through all filters
+	processImageWithAllFilters := func(t *testing.T, inputPath string) {
+		// Create a fresh DSL instance for each test
+		createTestLanguage()
+
+		baseName := filepath.Base(inputPath)
+		nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
+
+		// Basic filter tests
+		filters := []struct {
+			name   string
+			script string
+		}{
+			{"invert", `save(invert(load(%q)) %q)`},
+			{"grayscale", `save(grayscale(load(%q)) %q)`},
+			{"sepia", `save(sepia(load(%q)) %q)`},
+			{"blur-light", `save(blur(load(%q) 2) %q)`},
+			{"blur-medium", `save(blur(load(%q) 5) %q)`},
+			{"blur-heavy", `save(blur(load(%q) 8) %q)`},
+			{"brightness-dark", `save(brightness(load(%q) 0.5) %q)`},
+			{"brightness-normal", `save(brightness(load(%q) 1.0) %q)`},
+			{"brightness-bright", `save(brightness(load(%q) 1.5) %q)`},
+		}
+
+		// Process basic filters
+		for _, filter := range filters {
+			dsl.restoreState() // Restore clean state for each test
+			outputPath := fmt.Sprintf("../../%s-%s.png", nameWithoutExt, filter.name)
+			script := fmt.Sprintf(filter.script, inputPath, outputPath)
+			_, err := dsl.run(script, false)
+			if err != nil {
+				t.Errorf("Failed to process %s with %s: %v", baseName, filter.name, err)
+			}
+		}
+
+		// Combined filter tests
+		combinations := []struct {
+			name   string
+			script string
+		}{
+			{"invert-blur", `save(blur(invert(load(%q)) 3) %q)`},
+			{"grayscale-bright", `save(brightness(grayscale(load(%q)) 1.4) %q)`},
+			{"sepia-blur", `save(blur(sepia(load(%q)) 3) %q)`},
+			{"invert-sepia", `save(sepia(invert(load(%q))) %q)`},
+			{"blur-bright", `save(brightness(blur(load(%q) 3) 1.3) %q)`},
+			{"grayscale-sepia", `save(sepia(grayscale(load(%q))) %q)`},
+			{"triple-effect", `save(blur(sepia(brightness(load(%q) 1.2)) 2) %q)`},
+		}
+
+		// Process combinations
+		for _, combo := range combinations {
+			dsl.restoreState() // Restore clean state for each test
+			outputPath := fmt.Sprintf("../../%s-%s.png", nameWithoutExt, combo.name)
+			script := fmt.Sprintf(combo.script, inputPath, outputPath)
+			_, err := dsl.run(script, false)
+			if err != nil {
+				t.Errorf("Failed to process %s with %s: %v", baseName, combo.name, err)
+			}
+		}
+
+		// Error case tests
+		errorCases := []struct {
+			name   string
+			script string
+		}{
+			{"brightness-error", `save(brightness(load(%q) 2.5) %q)`},
+			{"blur-error", `save(blur(load(%q) 11) %q)`},
+		}
+
+		// Process error cases
+		for _, errCase := range errorCases {
+			dsl.restoreState() // Restore clean state for each test
+			outputPath := fmt.Sprintf("../../%s-%s-error.png", nameWithoutExt, errCase.name)
+			script := fmt.Sprintf(errCase.script, inputPath, outputPath)
+			_, err := dsl.run(script, false)
+			if err == nil {
+				t.Errorf("Expected error for %s with %s but got none", baseName, errCase.name)
+			}
+		}
+	}
+
+	t.Run("Comprehensive Filter Tests", func(t *testing.T) {
+		// Read all test images from the directory
+		testImagesDir := "test_images"
+		entries, err := os.ReadDir(testImagesDir)
+		if err != nil {
+			t.Fatalf("Failed to read test_images directory: %v", err)
+		}
+
+		// Process each test image
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".png") {
+				inputPath := filepath.Join(testImagesDir, entry.Name())
+				t.Run(entry.Name(), func(t *testing.T) {
+					processImageWithAllFilters(t, inputPath)
+				})
+			}
 		}
 	})
 }

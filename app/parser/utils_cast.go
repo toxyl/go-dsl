@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,6 +18,11 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 
 	// Validate input type
 	switch value.(type) {
+	case *image.NRGBA64:
+		if targetType != "*image.NRGBA64" {
+			return nil, dsl.errors.CAST_NOT_POSSIBLE("*image.NRGBA64", targetType)
+		}
+		return value, nil
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
 		// These types are supported
 	default:

@@ -37,6 +37,7 @@ type dslCollection struct {
 		UNSUPPORTED_TARGET_TYPE             func(typ string) error
 		STRING_CAST                         func(str, typ string) error
 		NIL_CAST                            func() error
+		CAST_NOT_POSSIBLE                   func(source, target string) error
 		UNSUPPORTED_SOURCE_TYPE             func(v any) error
 		TKN_ASSIGN_VALUE_MISSING            func() error
 		TKN_ASSIGN_NAME_MISSING             func() error
@@ -117,6 +118,7 @@ var dsl = dslCollection{
 		UNSUPPORTED_TARGET_TYPE             func(typ string) error
 		STRING_CAST                         func(str string, typ string) error
 		NIL_CAST                            func() error
+		CAST_NOT_POSSIBLE                   func(source, target string) error
 		UNSUPPORTED_SOURCE_TYPE             func(v any) error
 		TKN_ASSIGN_VALUE_MISSING            func() error
 		TKN_ASSIGN_NAME_MISSING             func() error
@@ -153,6 +155,7 @@ var dsl = dslCollection{
 		UNSUPPORTED_TARGET_TYPE:  func(typ string) error { return dslError("unsupported target type: %s", typ) },
 		STRING_CAST:              func(str, typ string) error { return dslError("cannot cast string %q to %s", str, typ) },
 		NIL_CAST:                 func() error { return dslError("cannot cast nil value") },
+		CAST_NOT_POSSIBLE:        func(source, target string) error { return dslError("cannot cast from %s to %s", source, target) },
 		UNSUPPORTED_SOURCE_TYPE:  func(v any) error { return dslError("unsupported source type: %T", v) },
 		TKN_ASSIGN_VALUE_MISSING: func() error { return dslError("missing var value in assign") },
 		TKN_ASSIGN_NAME_MISSING:  func() error { return dslError("missing var name in assign") },

@@ -401,29 +401,6 @@ func createTestLanguage() {
 		},
 	)
 	dsl.funcs.register(
-		"debug-alpha", "Visualizes the alpha channel as grayscale",
-		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The alpha visualization"}},
-		func(a ...any) (any, error) {
-			img := a[0].(*image.NRGBA)
-			bounds := img.Bounds()
-			debug := image.NewNRGBA(bounds)
-
-			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					c := img.NRGBAAt(x, y)
-					debug.Set(x, y, color.NRGBA{
-						R: c.A,
-						G: c.A,
-						B: c.A,
-						A: 255,
-					})
-				}
-			}
-			return debug, nil
-		},
-	)
-	dsl.funcs.register(
 		"blend-multiply", "Overlays two images using the multiply blendmode",
 		[]dslParamMeta{
 			{name: "imgA", typ: "*image.RGBA", desc: "The lower image"},

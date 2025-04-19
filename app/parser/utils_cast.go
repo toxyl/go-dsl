@@ -19,11 +19,14 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 
 	// Validate input type
 	switch value.(type) {
+	// These types are supported
 	case *image.NRGBA, *image.RGBA, *image.RGBA64, *image.NRGBA64:
 		return dsl.castImage(value, targetType)
+	case color.RGBA, color.RGBA64:
+		return dsl.castColor(value, targetType)
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
-		// These types are supported
 	default:
+		// If we get here the type is not supported
 		return nil, dsl.errors.UNSUPPORTED_SOURCE_TYPE(value)
 	}
 
@@ -625,4 +628,35 @@ func (dsl *dslCollection) convertNRGBAToRGBA64(src *image.NRGBA) *image.RGBA64 {
 		}
 	}
 	return dst
+}
+
+// castColor handles conversions between different color types
+func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
+	switch v := value.(type) {
+	case color.RGBA:
+		switch targetType {
+		case "color.RGBA":
+			return v, nil
+		case "color.RGBA64":
+			return color.RGBA64{
+				R: uint16(v.R) * 257,
+				G: uint16(v.G) * 257,
+				B: uint16(v.B) * 257,
+				A: uint16(v.A) * 257,
+			}, nil
+		}
+	case color.RGBA64:
+		switch targetType {
+		case "color.RGBA":
+			return color.RGBA{
+				R: uint8(v.R >> 8),
+				G: uint8(v.G >> 8),
+				B: uint8(v.B >> 8),
+				A: uint8(v.A >> 8),
+			}, nil
+		case "color.RGBA64":
+			return v, nil
+		}
+	}
+	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 }

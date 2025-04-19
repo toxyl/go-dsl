@@ -49,7 +49,7 @@ type initTemplate struct {
 	FuncRegistry []initTemplateFunc
 }
 
-func (data *initTemplate) generateVarRegistrations(variables []metaVar) (needsImageImport bool) {
+func (data *initTemplate) generateVarRegistrations(variables []metaVar) (requiredImports []string) {
 	fnCheckNil := func(v any) string {
 		if v == nil {
 			return "nil"
@@ -60,7 +60,9 @@ func (data *initTemplate) generateVarRegistrations(variables []metaVar) (needsIm
 	for _, v := range variables {
 		switch v.typ {
 		case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
-			needsImageImport = true
+			requiredImports = append(requiredImports, "image")
+		case "color.RGBA", "color.RGBA64":
+			requiredImports = append(requiredImports, "image/color")
 		}
 		data.VarRegistry = append(data.VarRegistry, initTemplateVar{
 			OrgName: v.orgName,
@@ -76,7 +78,7 @@ func (data *initTemplate) generateVarRegistrations(variables []metaVar) (needsIm
 	return
 }
 
-func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (needsImageImport bool) {
+func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (requiredImports []string) {
 	data.FuncRegistry = []initTemplateFunc{}
 	for _, fn := range functions {
 		tmplData := initTemplateFunc{
@@ -89,7 +91,9 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (needs
 		for i, param := range fn.params {
 			switch param.typ {
 			case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
-				needsImageImport = true
+				requiredImports = append(requiredImports, "image")
+			case "color.RGBA", "color.RGBA64":
+				requiredImports = append(requiredImports, "image/color")
 			}
 
 			tmplData.Params = append(tmplData.Params, initTemplateParam{
@@ -106,7 +110,9 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (needs
 		for i, ret := range fn.returns {
 			switch ret.typ {
 			case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
-				needsImageImport = true
+				requiredImports = append(requiredImports, "image")
+			case "color.RGBA", "color.RGBA64":
+				requiredImports = append(requiredImports, "image/color")
 			}
 
 			tmplData.Returns = append(tmplData.Returns, initTemplateParam{
@@ -128,6 +134,18 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (needs
 //go:embed init.tmpl
 var tmplInit string
 
+func getUniqueStrings(slice []string) []string {
+	seen := make(map[string]struct{})
+	result := []string{}
+	for _, item := range slice {
+		if _, exists := seen[item]; !exists {
+			seen[item] = struct{}{}
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
 func genInitCode(id string, name string, desc string, version string, extension string, pkg string, fns []metaFunc, vars []metaVar) string {
 	tmpl, err := template.New("init").Parse(tmplInit)
 	if err != nil {
@@ -143,9 +161,10 @@ func genInitCode(id string, name string, desc string, version string, extension 
 		Version:     version,
 		Extension:   extension,
 	}
-	if data.generateVarRegistrations(vars) || data.generateFuncRegistrations(fns) {
-		data.Imports = append(data.Imports, "image")
-	}
+	imports := []string{}
+	imports = append(imports, data.generateVarRegistrations(vars)...)
+	imports = append(imports, data.generateFuncRegistrations(fns)...)
+	data.Imports = getUniqueStrings(imports)
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {

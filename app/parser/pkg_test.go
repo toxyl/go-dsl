@@ -411,51 +411,27 @@ func createTestLanguage() {
 			imgA := a[0].(*image.RGBA64)
 			imgB := a[1].(*image.RGBA64)
 
-			// Create a new image with the same bounds
+			result := createNewRGBA64FromBounds(imgA)
 			bounds := imgA.Bounds()
-			result := image.NewRGBA64(bounds)
 
 			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					// Get premultiplied colors
 					c1 := imgA.RGBA64At(x, y)
 					c2 := imgB.RGBA64At(x, y)
 
-					// Work with 32-bit precision for intermediate calculations
-					a1 := uint32(c1.A)
-					r1 := uint32(c1.R)
-					g1 := uint32(c1.G)
-					b1 := uint32(c1.B)
+					r1, g1, b1, a1 := getRGBA64Components(c1)
+					r2, g2, b2, a2 := getRGBA64Components(c2)
 
-					a2 := uint32(c2.A)
-					r2 := uint32(c2.R)
-					g2 := uint32(c2.G)
-					b2 := uint32(c2.B)
-
-					// Porter-Duff alpha compositing
-					aOut := a1 + a2 - ((a1 * a2) / 0xffff)
+					aOut := porterDuffAlpha(a1, a2)
 
 					var rOut, gOut, bOut uint32
 					if aOut > 0 {
-						// Multiply blend mode with minimal conversions
-						// For each channel: (c1 * c2) + (c1 * (0xffff - a2)) + (c2 * (0xffff - a1)) all in fixed point
 						rOut = ((r1 * r2) + (r1 * (0xffff - a2)) + (r2 * (0xffff - a1))) / 0xffff
 						gOut = ((g1 * g2) + (g1 * (0xffff - a2)) + (g2 * (0xffff - a1))) / 0xffff
 						bOut = ((b1 * b2) + (b1 * (0xffff - a2)) + (b2 * (0xffff - a1))) / 0xffff
 					}
 
-					// Clamp to valid range
-					rOut = min(rOut, 0xffff)
-					gOut = min(gOut, 0xffff)
-					bOut = min(bOut, 0xffff)
-					aOut = min(aOut, 0xffff)
-
-					result.SetRGBA64(x, y, color.RGBA64{
-						R: uint16(rOut),
-						G: uint16(gOut),
-						B: uint16(bOut),
-						A: uint16(aOut),
-					})
+					setRGBA64Color(result, x, y, rOut, gOut, bOut, aOut)
 				}
 			}
 
@@ -473,31 +449,64 @@ func createTestLanguage() {
 			imgA := a[0].(*image.RGBA64)
 			imgB := a[1].(*image.RGBA64)
 
-			// Create a new image with the same bounds
+			result := createNewRGBA64FromBounds(imgA)
 			bounds := imgA.Bounds()
-			resultPre := image.NewRGBA64(bounds)
 
-			// Iterate through each pixel
 			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					// Get colors from both images (already premultiplied)
 					c1 := imgA.RGBA64At(x, y)
 					c2 := imgB.RGBA64At(x, y)
 
-					// Screen blend mode in premultiplied space: 1 - (1 - a) * (1 - b)
-					r := uint16(0xffff - ((0xffff - uint32(c1.R)) * (0xffff - uint32(c2.R)) / 0xffff))
-					g := uint16(0xffff - ((0xffff - uint32(c1.G)) * (0xffff - uint32(c2.G)) / 0xffff))
-					b := uint16(0xffff - ((0xffff - uint32(c1.B)) * (0xffff - uint32(c2.B)) / 0xffff))
-					// Alpha compositing
-					a := uint16(0xffff - ((0xffff - uint32(c1.A)) * (0xffff - uint32(c2.A)) / 0xffff))
+					r1, g1, b1, a1 := getRGBA64Components(c1)
+					r2, g2, b2, a2 := getRGBA64Components(c2)
 
-					// Set the resulting color
-					resultPre.Set(x, y, color.RGBA64{r, g, b, a})
+					// Screen blend mode in premultiplied space: 1 - (1 - a) * (1 - b)
+					r := 0xffff - ((0xffff - r1) * (0xffff - r2) / 0xffff)
+					g := 0xffff - ((0xffff - g1) * (0xffff - g2) / 0xffff)
+					b := 0xffff - ((0xffff - b1) * (0xffff - b2) / 0xffff)
+					a := porterDuffAlpha(a1, a2)
+
+					setRGBA64Color(result, x, y, r, g, b, a)
 				}
 			}
 
-			// Convert back to non-premultiplied alpha
-			return resultPre, nil
+			return result, nil
+		},
+	)
+	dsl.funcs.register(
+		"blend-exclusion", "Overlays two images using the exclusion blendmode",
+		[]dslParamMeta{
+			{name: "imgA", typ: "*image.RGBA64", desc: "The lower image"},
+			{name: "imgB", typ: "*image.RGBA64", desc: "The upper image"},
+		},
+		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The blended images"}},
+		func(a ...any) (any, error) {
+			imgA := a[0].(*image.RGBA64)
+			imgB := a[1].(*image.RGBA64)
+
+			result := createNewRGBA64FromBounds(imgA)
+			bounds := imgA.Bounds()
+
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c1 := imgA.RGBA64At(x, y)
+					c2 := imgB.RGBA64At(x, y)
+
+					r1, g1, b1, a1 := getRGBA64Components(c1)
+					r2, g2, b2, a2 := getRGBA64Components(c2)
+
+					// Exclusion blend mode formula: a + b - 2ab
+					// For each channel, we calculate: bottom + top - (2 * bottom * top / max)
+					r := r1 + r2 - ((r1 * r2) >> 15)
+					g := g1 + g2 - ((g1 * g2) >> 15)
+					b := b1 + b2 - ((b1 * b2) >> 15)
+					a := porterDuffAlpha(a1, a2)
+
+					setRGBA64Color(result, x, y, r, g, b, a)
+				}
+			}
+
+			return result, nil
 		},
 	)
 	dsl.storeState()
@@ -1462,6 +1471,7 @@ func TestImageProcessing(t *testing.T) {
 		}{
 			{"blend-multiply", `save(blend-multiply(load(%q) load(%q)) %q)`},
 			{"blend-screen", `save(blend-screen(load(%q) load(%q)) %q)`},
+			{"blend-exclusion", `save(blend-exclusion(load(%q) load(%q)) %q)`},
 		}
 
 		// Process basic blendmodes
@@ -1580,4 +1590,29 @@ func TestShell(t *testing.T) {
 		createTestLanguage()
 		dsl.shell()
 	})
+}
+
+// Helper function to create a new RGBA64 image with the same bounds as the source
+func createNewRGBA64FromBounds(img *image.RGBA64) *image.RGBA64 {
+	return image.NewRGBA64(img.Bounds())
+}
+
+// Helper function to get RGBA64 components as uint32 for calculations
+func getRGBA64Components(c color.RGBA64) (r, g, b, a uint32) {
+	return uint32(c.R), uint32(c.G), uint32(c.B), uint32(c.A)
+}
+
+// Helper function to set RGBA64 color with clamped values
+func setRGBA64Color(img *image.RGBA64, x, y int, r, g, b, a uint32) {
+	img.Set(x, y, color.RGBA64{
+		R: uint16(min(r, 0xffff)),
+		G: uint16(min(g, 0xffff)),
+		B: uint16(min(b, 0xffff)),
+		A: uint16(min(a, 0xffff)),
+	})
+}
+
+// Helper function for Porter-Duff alpha compositing
+func porterDuffAlpha(a1, a2 uint32) uint32 {
+	return a1 + a2 - ((a1 * a2) / 0xffff)
 }

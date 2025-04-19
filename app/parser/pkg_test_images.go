@@ -256,15 +256,6 @@ func generateTextPatternImage() error {
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/text_pattern.png")
 }
 
-// LoadTextPatternImage loads the text pattern image
-func LoadTextPatternImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/text_pattern.png")
-	if err != nil {
-		return nil
-	}
-	return img
-}
-
 // generateConcentricsImage creates concentric circles with varying colors
 func generateConcentricsImage() error {
 	const width, height = 256, 256
@@ -295,15 +286,6 @@ func generateConcentricsImage() error {
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/concentrics.png")
 }
 
-// LoadConcentricsImage loads the concentrics image
-func LoadConcentricsImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/concentrics.png")
-	if err != nil {
-		return nil
-	}
-	return img
-}
-
 // generateHighContrastImage creates a high contrast pattern
 func generateHighContrastImage() error {
 	const width, height = 256, 256
@@ -322,15 +304,6 @@ func generateHighContrastImage() error {
 	}
 
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/high_contrast.png")
-}
-
-// LoadHighContrastImage loads the high contrast image
-func LoadHighContrastImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/high_contrast.png")
-	if err != nil {
-		return nil
-	}
-	return img
 }
 
 // generateRainbowStripsImage creates horizontal rainbow strips
@@ -360,15 +333,6 @@ func generateRainbowStripsImage() error {
 	}
 
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/rainbow_strips.png")
-}
-
-// LoadRainbowStripsImage loads the rainbow strips image
-func LoadRainbowStripsImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/rainbow_strips.png")
-	if err != nil {
-		return nil
-	}
-	return img
 }
 
 // generateEdgeDetectionImage creates patterns good for testing edge detection
@@ -404,15 +368,6 @@ func generateEdgeDetectionImage() error {
 	}
 
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/edge_test.png")
-}
-
-// LoadEdgeDetectionImage loads the edge test image
-func LoadEdgeDetectionImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/edge_test.png")
-	if err != nil {
-		return nil
-	}
-	return img
 }
 
 // generateEdgeCasesImage creates an image with various edge cases
@@ -453,15 +408,6 @@ func generateEdgeCasesImage() error {
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/edge_cases.png")
 }
 
-// LoadEdgeCasesImage loads the edge test image
-func LoadEdgeCasesImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/edge_cases.png")
-	if err != nil {
-		return nil
-	}
-	return img
-}
-
 // generateAlphaGradientImage creates a pattern with pure alpha gradients
 func generateAlphaGradientImage() error {
 	const width, height = 256, 256
@@ -484,15 +430,6 @@ func generateAlphaGradientImage() error {
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/alpha_gradient.png")
 }
 
-// LoadAlphaGradientImage loads the alpha gradient image
-func LoadAlphaGradientImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/alpha_gradient.png")
-	if err != nil {
-		return nil
-	}
-	return img
-}
-
 // generateGradientImage creates a gradient image with transparency
 func generateGradientImage() error {
 	const width, height = 256, 256
@@ -511,15 +448,6 @@ func generateGradientImage() error {
 	}
 
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/gradient.png")
-}
-
-// LoadGradientImage loads the gradient image
-func LoadGradientImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/gradient.png")
-	if err != nil {
-		return nil
-	}
-	return img
 }
 
 // generateCheckerboardImage creates a checkerboard pattern with transparency
@@ -545,15 +473,6 @@ func generateCheckerboardImage() error {
 	}
 
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/checkerboard.png")
-}
-
-// LoadGradientImage loads the checkerboard image
-func LoadCheckerboardImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/checkerboard.png")
-	if err != nil {
-		return nil
-	}
-	return img
 }
 
 // generateColorWheelImage creates a color wheel with transparency
@@ -588,15 +507,6 @@ func generateColorWheelImage() error {
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/color_wheel.png")
 }
 
-// LoadColorWheelImage loads the color wheel image
-func LoadColorWheelImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/color_wheel.png")
-	if err != nil {
-		return nil
-	}
-	return img
-}
-
 // generateNoiseImage creates a noise pattern with transparency
 func generateNoiseImage() error {
 	const width, height = 256, 256
@@ -617,13 +527,4 @@ func generateNoiseImage() error {
 	}
 
 	return saveImage(drawBounds(drawGrid(img, 20)), "./test_output/test_images/noise.png")
-}
-
-// LoadNoiseImage loads the noise image
-func LoadNoiseImage() *image.NRGBA {
-	img, err := loadImage("./test_output/test_images/noise.png")
-	if err != nil {
-		return nil
-	}
-	return img
 }

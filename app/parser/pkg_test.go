@@ -465,34 +465,34 @@ func createTestLanguage() {
 	dsl.funcs.register(
 		"blend-screen", "Overlays two images using the screen blendmode",
 		[]dslParamMeta{
-			{name: "imgA", typ: "*image.RGBA", desc: "The lower image"},
-			{name: "imgB", typ: "*image.RGBA", desc: "The upper image"},
+			{name: "imgA", typ: "*image.RGBA64", desc: "The lower image"},
+			{name: "imgB", typ: "*image.RGBA64", desc: "The upper image"},
 		},
-		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The blended images"}},
+		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The blended images"}},
 		func(a ...any) (any, error) {
-			imgA := a[0].(*image.RGBA)
-			imgB := a[1].(*image.RGBA)
+			imgA := a[0].(*image.RGBA64)
+			imgB := a[1].(*image.RGBA64)
 
 			// Create a new image with the same bounds
 			bounds := imgA.Bounds()
-			resultPre := image.NewRGBA(bounds)
+			resultPre := image.NewRGBA64(bounds)
 
 			// Iterate through each pixel
 			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 				for x := bounds.Min.X; x < bounds.Max.X; x++ {
 					// Get colors from both images (already premultiplied)
-					c1 := imgA.RGBAAt(x, y)
-					c2 := imgB.RGBAAt(x, y)
+					c1 := imgA.RGBA64At(x, y)
+					c2 := imgB.RGBA64At(x, y)
 
 					// Screen blend mode in premultiplied space: 1 - (1 - a) * (1 - b)
-					r := uint8(255 - ((255 - uint32(c1.R)) * (255 - uint32(c2.R)) / 255))
-					g := uint8(255 - ((255 - uint32(c1.G)) * (255 - uint32(c2.G)) / 255))
-					b := uint8(255 - ((255 - uint32(c1.B)) * (255 - uint32(c2.B)) / 255))
+					r := uint16(0xffff - ((0xffff - uint32(c1.R)) * (0xffff - uint32(c2.R)) / 0xffff))
+					g := uint16(0xffff - ((0xffff - uint32(c1.G)) * (0xffff - uint32(c2.G)) / 0xffff))
+					b := uint16(0xffff - ((0xffff - uint32(c1.B)) * (0xffff - uint32(c2.B)) / 0xffff))
 					// Alpha compositing
-					a := uint8(255 - ((255 - uint32(c1.A)) * (255 - uint32(c2.A)) / 255))
+					a := uint16(0xffff - ((0xffff - uint32(c1.A)) * (0xffff - uint32(c2.A)) / 0xffff))
 
 					// Set the resulting color
-					resultPre.Set(x, y, color.RGBA{r, g, b, a})
+					resultPre.Set(x, y, color.RGBA64{r, g, b, a})
 				}
 			}
 
@@ -1452,7 +1452,6 @@ func TestImageProcessing(t *testing.T) {
 			if err != nil {
 				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, filter.name, err)
 			}
-			fmt.Println(inputPathBottom, "-", outputPath, "-", outputPathSprite)
 			saveImage(generateImageSprite(inputPathBottom, outputPath), outputPathSprite)
 		}
 

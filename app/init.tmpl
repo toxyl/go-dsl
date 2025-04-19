@@ -6,6 +6,10 @@
 
 package {{ .Package }}
 
+import ({{ range .Imports }}
+    {{ . | printf "%q" }}{{ end }}
+)
+
 func init() {
     // First we need to initialize our language
     // so it becomes available in our pseudo-namespace.

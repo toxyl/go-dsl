@@ -39,6 +39,7 @@ type initTemplateVar struct {
 
 type initTemplate struct {
 	Package      string
+	Imports      []string
 	ID           string
 	Name         string
 	Description  string
@@ -48,7 +49,7 @@ type initTemplate struct {
 	FuncRegistry []initTemplateFunc
 }
 
-func (data *initTemplate) generateVarRegistrations(variables []metaVar) {
+func (data *initTemplate) generateVarRegistrations(variables []metaVar) (needsImageImport bool) {
 	fnCheckNil := func(v any) string {
 		if v == nil {
 			return "nil"
@@ -57,6 +58,10 @@ func (data *initTemplate) generateVarRegistrations(variables []metaVar) {
 	}
 	data.VarRegistry = []initTemplateVar{}
 	for _, v := range variables {
+		switch v.typ {
+		case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
+			needsImageImport = true
+		}
 		data.VarRegistry = append(data.VarRegistry, initTemplateVar{
 			OrgName: v.orgName,
 			Name:    v.name,
@@ -68,9 +73,10 @@ func (data *initTemplate) generateVarRegistrations(variables []metaVar) {
 			Def:     fnCheckNil(v.def),
 		})
 	}
+	return
 }
 
-func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) {
+func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (needsImageImport bool) {
 	data.FuncRegistry = []initTemplateFunc{}
 	for _, fn := range functions {
 		tmplData := initTemplateFunc{
@@ -81,6 +87,11 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) {
 			Returns: []initTemplateParam{},
 		}
 		for i, param := range fn.params {
+			switch param.typ {
+			case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
+				needsImageImport = true
+			}
+
 			tmplData.Params = append(tmplData.Params, initTemplateParam{
 				Index: i,
 				Name:  param.name,
@@ -93,6 +104,11 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) {
 			})
 		}
 		for i, ret := range fn.returns {
+			switch ret.typ {
+			case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
+				needsImageImport = true
+			}
+
 			tmplData.Returns = append(tmplData.Returns, initTemplateParam{
 				Index: i,
 				Name:  ret.name,
@@ -106,6 +122,7 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) {
 		}
 		data.FuncRegistry = append(data.FuncRegistry, tmplData)
 	}
+	return
 }
 
 //go:embed init.tmpl
@@ -119,14 +136,16 @@ func genInitCode(id string, name string, desc string, version string, extension 
 
 	data := initTemplate{
 		Package:     pkg,
+		Imports:     []string{},
 		ID:          id,
 		Name:        name,
 		Description: desc,
 		Version:     version,
 		Extension:   extension,
 	}
-	data.generateVarRegistrations(vars)
-	data.generateFuncRegistrations(fns)
+	if data.generateVarRegistrations(vars) || data.generateFuncRegistrations(fns) {
+		data.Imports = append(data.Imports, "image")
+	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {

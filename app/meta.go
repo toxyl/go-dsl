@@ -46,7 +46,12 @@ func extractFunctionMeta(node *ast.File, functions []metaFunc) []metaFunc {
 			if fn.Type != nil && fn.Type.Params != nil && fn.Type.Params.List != nil {
 				for _, param := range fn.Type.Params.List {
 					for _, name := range param.Names {
-						types[name.Name] = param.Type.(*ast.Ident).Name
+						switch param.Type.(type) {
+						case *ast.StarExpr:
+							types[name.Name] = "*" + param.Type.(*ast.StarExpr).X.(*ast.SelectorExpr).X.(*ast.Ident).Name + "." + param.Type.(*ast.StarExpr).X.(*ast.SelectorExpr).Sel.Name
+						case *ast.Ident:
+							types[name.Name] = param.Type.(*ast.Ident).Name
+						}
 					}
 				}
 			}

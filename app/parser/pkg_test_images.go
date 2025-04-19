@@ -17,8 +17,6 @@ const (
 
 // GenerateTestImages creates a set of test images for blend mode and filter testing
 func GenerateTestImages() error {
-	dsl := &dslCollection{}
-
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(imageTestOutputDir, 0755); err != nil {
 		return err
@@ -49,13 +47,13 @@ func GenerateTestImages() error {
 		name string
 		img  *image.NRGBA
 	}{
-		{"gradient", dsl.GenerateGradient()},
-		{"checkerboard", dsl.GenerateCheckerboard()},
-		{"color_wheel", dsl.GenerateColorWheel()},
-		{"noise", dsl.GenerateNoise()},
-		{"alpha_gradient", dsl.GenerateAlphaGradient()},
-		{"color_bands", dsl.GenerateColorBands()},
-		{"edge_cases", dsl.GenerateEdgeCases()},
+		{"gradient", GenerateGradientImage()},
+		{"checkerboard", GenerateCheckerboardImage()},
+		{"color_wheel", GenerateColorWheelImage()},
+		{"noise", GenerateNoiseImage()},
+		{"alpha_gradient", GenerateAlphaGradientImage()},
+		{"color_bands", GenerateColorBandsImage()},
+		{"edge_cases", GenerateEdgeCasesImage()},
 	}
 
 	for _, ti := range testImages {
@@ -394,8 +392,8 @@ func generateAlphaGradientImage() error {
 	return saveImage(img, "test_images/alpha_gradient.png")
 }
 
-// GenerateAlphaGradient creates an image with varying alpha values
-func (dsl *dslCollection) GenerateAlphaGradient() *image.NRGBA {
+// GenerateAlphaGradientImage creates an image with varying alpha values
+func GenerateAlphaGradientImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
@@ -413,8 +411,8 @@ func (dsl *dslCollection) GenerateAlphaGradient() *image.NRGBA {
 	return img
 }
 
-// GenerateColorBands creates an image with distinct color bands
-func (dsl *dslCollection) GenerateColorBands() *image.NRGBA {
+// GenerateColorBandsImage creates an image with distinct color bands
+func GenerateColorBandsImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
@@ -440,8 +438,8 @@ func (dsl *dslCollection) GenerateColorBands() *image.NRGBA {
 	return img
 }
 
-// GenerateEdgeCases creates an image with various edge cases
-func (dsl *dslCollection) GenerateEdgeCases() *image.NRGBA {
+// GenerateEdgeCasesImage creates an image with various edge cases
+func GenerateEdgeCasesImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
@@ -479,8 +477,8 @@ func (dsl *dslCollection) GenerateEdgeCases() *image.NRGBA {
 	return img
 }
 
-// GenerateGradient creates a gradient image with transparency
-func (dsl *dslCollection) GenerateGradient() *image.NRGBA {
+// GenerateGradientImage creates a gradient image with transparency
+func GenerateGradientImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
@@ -508,8 +506,8 @@ func (dsl *dslCollection) GenerateGradient() *image.NRGBA {
 	return img
 }
 
-// GenerateCheckerboard creates a checkerboard pattern with transparency
-func (dsl *dslCollection) GenerateCheckerboard() *image.NRGBA {
+// GenerateCheckerboardImage creates a checkerboard pattern with transparency
+func GenerateCheckerboardImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	squareSize := 32
@@ -529,8 +527,8 @@ func (dsl *dslCollection) GenerateCheckerboard() *image.NRGBA {
 	return img
 }
 
-// GenerateColorWheel creates a color wheel image with transparency
-func (dsl *dslCollection) GenerateColorWheel() *image.NRGBA {
+// GenerateColorWheelImage creates a color wheel image with transparency
+func GenerateColorWheelImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	centerX, centerY := width/2, height/2
@@ -569,8 +567,8 @@ func (dsl *dslCollection) GenerateColorWheel() *image.NRGBA {
 	return img
 }
 
-// GenerateNoise creates a noise pattern with varying transparency
-func (dsl *dslCollection) GenerateNoise() *image.NRGBA {
+// GenerateNoiseImage creates a noise pattern with varying transparency
+func GenerateNoiseImage() *image.NRGBA {
 	width, height := 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	rand.Seed(42) // Fixed seed for reproducibility

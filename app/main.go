@@ -23,6 +23,10 @@ func getParserFS() embed.FS {
 }
 
 func cloneSourceFromFS(fs embed.FS, src, dst, pkg string) {
+	if strings.HasPrefix(filepath.Base(src), "pkg_test") {
+		// don't copy test files
+		return
+	}
 	clone, err := fs.ReadFile(src)
 	if err != nil {
 		log.Fatal(err)

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 	"sort"
@@ -504,6 +505,11 @@ func (dsl *dslCollection) shell() {
 		}
 
 		// Print the result
-		fmt.Printf("\x1b[32m┃ %v\x1b[0m\n", result.value)
+		switch result.value.(type) {
+		case *image.RGBA, *image.NRGBA, *image.RGBA64, *image.NRGBA64:
+			fmt.Printf("\x1b[32m┃ %v\x1b[0m\n", "image")
+		default:
+			fmt.Printf("\x1b[32m┃ %v\x1b[0m\n", result.value)
+		}
 	}
 }

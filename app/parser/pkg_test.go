@@ -424,79 +424,75 @@ func createTestLanguage() {
 		},
 	)
 	dsl.funcs.register(
-		"debug-bounds", "Highlights the image bounds and center",
-		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The bounds visualization"}},
+		"blend-multiply", "Overlays two images using the multiply blendmode",
+		[]dslParamMeta{
+			{name: "imgA", typ: "*image.NRGBA", desc: "The lower image"},
+			{name: "imgB", typ: "*image.NRGBA", desc: "The upper image"},
+		},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The blended images"}},
 		func(a ...any) (any, error) {
-			img := a[0].(*image.NRGBA)
-			bounds := img.Bounds()
-			debug := image.NewNRGBA(bounds)
+			imgA := a[0].(*image.NRGBA)
+			imgB := a[1].(*image.NRGBA)
 
-			// Copy original image
+			// Create a new image with the same bounds as imgA
+			bounds := imgA.Bounds()
+			result := image.NewNRGBA(bounds)
+
+			// Iterate through each pixel
 			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					debug.Set(x, y, img.NRGBAAt(x, y))
+					// Get colors from both images
+					c1 := imgA.NRGBAAt(x, y)
+					c2 := imgB.NRGBAAt(x, y)
+
+					// Multiply the color channels
+					r := uint8((uint32(c1.R) * uint32(c2.R)) / 255)
+					g := uint8((uint32(c1.G) * uint32(c2.G)) / 255)
+					b := uint8((uint32(c1.B) * uint32(c2.B)) / 255)
+					a := uint8((uint32(c1.A) * uint32(c2.A)) / 255)
+
+					// Set the resulting color
+					result.SetNRGBA(x, y, color.NRGBA{r, g, b, a})
 				}
 			}
 
-			// Draw bounds
-			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				debug.Set(x, bounds.Min.Y, color.NRGBA{255, 0, 0, 255})   // Top
-				debug.Set(x, bounds.Max.Y-1, color.NRGBA{255, 0, 0, 255}) // Bottom
-			}
-			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-				debug.Set(bounds.Min.X, y, color.NRGBA{255, 0, 0, 255})   // Left
-				debug.Set(bounds.Max.X-1, y, color.NRGBA{255, 0, 0, 255}) // Right
-			}
-
-			// Draw center cross
-			centerX := (bounds.Min.X + bounds.Max.X) / 2
-			centerY := (bounds.Min.Y + bounds.Max.Y) / 2
-			for i := -5; i <= 5; i++ {
-				if centerX+i >= bounds.Min.X && centerX+i < bounds.Max.X {
-					debug.Set(centerX+i, centerY, color.NRGBA{0, 255, 0, 255})
-				}
-				if centerY+i >= bounds.Min.Y && centerY+i < bounds.Max.Y {
-					debug.Set(centerX, centerY+i, color.NRGBA{0, 255, 0, 255})
-				}
-			}
-
-			return debug, nil
+			return result, nil
 		},
 	)
 	dsl.funcs.register(
-		"debug-grid", "Overlays a grid on the image",
+		"blend-screen", "Overlays two images using the screen blendmode",
 		[]dslParamMeta{
-			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
-			{name: "size", typ: "int", desc: "Grid size in pixels"},
+			{name: "imgA", typ: "*image.NRGBA", desc: "The lower image"},
+			{name: "imgB", typ: "*image.NRGBA", desc: "The upper image"},
 		},
-		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The grid visualization"}},
+		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The blended images"}},
 		func(a ...any) (any, error) {
-			img := a[0].(*image.NRGBA)
-			gridSize := a[1].(int)
-			bounds := img.Bounds()
-			debug := image.NewNRGBA(bounds)
+			imgA := a[0].(*image.NRGBA)
+			imgB := a[1].(*image.NRGBA)
 
-			// Copy original image
+			// Create a new image with the same bounds as imgA
+			bounds := imgA.Bounds()
+			result := image.NewNRGBA(bounds)
+
+			// Iterate through each pixel
 			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					debug.Set(x, y, img.NRGBAAt(x, y))
+					// Get colors from both images
+					c1 := imgA.NRGBAAt(x, y)
+					c2 := imgB.NRGBAAt(x, y)
+
+					// Screen blend mode: 1 - (1 - a) * (1 - b)
+					r := uint8(255 - ((255 - uint32(c1.R)) * (255 - uint32(c2.R)) / 255))
+					g := uint8(255 - ((255 - uint32(c1.G)) * (255 - uint32(c2.G)) / 255))
+					b := uint8(255 - ((255 - uint32(c1.B)) * (255 - uint32(c2.B)) / 255))
+					a := uint8(255 - ((255 - uint32(c1.A)) * (255 - uint32(c2.A)) / 255))
+
+					// Set the resulting color
+					result.SetNRGBA(x, y, color.NRGBA{r, g, b, a})
 				}
 			}
 
-			// Draw grid
-			for y := bounds.Min.Y; y < bounds.Max.Y; y += gridSize {
-				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					debug.Set(x, y, color.NRGBA{0, 0, 0, 128})
-				}
-			}
-			for x := bounds.Min.X; x < bounds.Max.X; x += gridSize {
-				for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-					debug.Set(x, y, color.NRGBA{0, 0, 0, 128})
-				}
-			}
-
-			return debug, nil
+			return result, nil
 		},
 	)
 	dsl.storeState()
@@ -1409,21 +1405,21 @@ func TestParser(t *testing.T) {
 
 func TestImageProcessing(t *testing.T) {
 	// Helper function to process an image through all filters
-	processImageWithAllFilters := func(t *testing.T, inputPath string) {
+	processedImages := map[string]struct{}{}
+	processImageWithAllFilters := func(t *testing.T, inputPathBottom, inputPathTop string) {
 		// Create a fresh DSL instance for each test
 		createTestLanguage()
 
-		baseName := filepath.Base(inputPath)
-		nameWithoutExt := strings.TrimSuffix(baseName, filepath.Ext(baseName))
+		baseNameBottom := filepath.Base(inputPathBottom)
+		nameBottomWithoutExt := strings.TrimSuffix(baseNameBottom, filepath.Ext(baseNameBottom))
+		baseNameTop := filepath.Base(inputPathTop)
+		nameTopWithoutExt := strings.TrimSuffix(baseNameTop, filepath.Ext(baseNameTop))
 
 		// Basic filter tests
 		filters := []struct {
 			name   string
 			script string
 		}{
-			{"debug-alpha", `save(debug-alpha(load(%q)) %q)`},
-			{"debug-bounds", `save(debug-bounds(load(%q)) %q)`},
-			{"debug-grid", `save(debug-grid(load(%q) 10) %q)`},
 			{"invert", `save(invert(load(%q)) %q)`},
 			{"grayscale", `save(grayscale(load(%q)) %q)`},
 			{"sepia", `save(sepia(load(%q)) %q)`},
@@ -1438,11 +1434,39 @@ func TestImageProcessing(t *testing.T) {
 		// Process basic filters
 		for _, filter := range filters {
 			dsl.restoreState() // Restore clean state for each test
-			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s.png", nameWithoutExt, filter.name))
-			script := fmt.Sprintf(filter.script, inputPath, outputPath)
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s.png", nameBottomWithoutExt, filter.name))
+			if _, ok := processedImages[outputPath]; ok {
+				continue
+			}
+			processedImages[outputPath] = struct{}{}
+			script := fmt.Sprintf(filter.script, inputPathBottom, outputPath)
 			_, err := dsl.run(script, false)
 			if err != nil {
-				t.Errorf("Failed to process %s with %s: %v", baseName, filter.name, err)
+				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, filter.name, err)
+			}
+		}
+
+		// Basic blendmode tests
+		blendmodes := []struct {
+			name   string
+			script string
+		}{
+			{"blend-multiply", `save(blend-multiply(load(%q) load(%q)) %q)`},
+			{"blend-screen", `save(blend-screen(load(%q) load(%q)) %q)`},
+		}
+
+		// Process basic blendmodes
+		for _, filter := range blendmodes {
+			dsl.restoreState() // Restore clean state for each test
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s-%s.png", nameBottomWithoutExt, filter.name, nameTopWithoutExt))
+			if _, ok := processedImages[outputPath]; ok {
+				continue
+			}
+			processedImages[outputPath] = struct{}{}
+			script := fmt.Sprintf(filter.script, inputPathBottom, inputPathTop, outputPath)
+			_, err := dsl.run(script, false)
+			if err != nil {
+				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, filter.name, err)
 			}
 		}
 
@@ -1463,11 +1487,15 @@ func TestImageProcessing(t *testing.T) {
 		// Process combinations
 		for _, combo := range combinations {
 			dsl.restoreState() // Restore clean state for each test
-			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s.png", nameWithoutExt, combo.name))
-			script := fmt.Sprintf(combo.script, inputPath, outputPath)
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s.png", nameBottomWithoutExt, combo.name))
+			if _, ok := processedImages[outputPath]; ok {
+				continue
+			}
+			processedImages[outputPath] = struct{}{}
+			script := fmt.Sprintf(combo.script, inputPathBottom, outputPath)
 			_, err := dsl.run(script, false)
 			if err != nil {
-				t.Errorf("Failed to process %s with %s: %v", baseName, combo.name, err)
+				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, combo.name, err)
 			}
 		}
 
@@ -1483,11 +1511,15 @@ func TestImageProcessing(t *testing.T) {
 		// Process error cases
 		for _, errCase := range errorCases {
 			dsl.restoreState() // Restore clean state for each test
-			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s-error.png", nameWithoutExt, errCase.name))
-			script := fmt.Sprintf(errCase.script, inputPath, outputPath)
+			outputPath := filepath.Join(testOutputDir, fmt.Sprintf("%s-%s-error.png", nameBottomWithoutExt, errCase.name))
+			if _, ok := processedImages[outputPath]; ok {
+				continue
+			}
+			processedImages[outputPath] = struct{}{}
+			script := fmt.Sprintf(errCase.script, inputPathBottom, outputPath)
 			_, err := dsl.run(script, false)
 			if err == nil {
-				t.Errorf("Expected error for %s with %s but got none", baseName, errCase.name)
+				t.Errorf("Expected error for %s with %s but got none", baseNameBottom, errCase.name)
 			}
 		}
 	}
@@ -1504,13 +1536,21 @@ func TestImageProcessing(t *testing.T) {
 			t.Fatalf("Failed to read test images directory: %v", err)
 		}
 
-		// Process each test image
+		testImages := []string{}
+
 		for _, entry := range entries {
 			if !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".png") {
 				inputPath := filepath.Join(imageTestOutputDir, entry.Name())
 				t.Run(entry.Name(), func(t *testing.T) {
-					processImageWithAllFilters(t, inputPath)
+					testImages = append(testImages, inputPath)
 				})
+			}
+		}
+
+		// Process each test image
+		for _, inA := range testImages {
+			for _, inB := range testImages {
+				processImageWithAllFilters(t, inA, inB)
 			}
 		}
 	})

@@ -47,13 +47,13 @@ func GenerateTestImages() error {
 		name string
 		img  *image.NRGBA
 	}{
-		{"gradient", GenerateGradientImage()},
-		{"checkerboard", GenerateCheckerboardImage()},
-		{"color_wheel", GenerateColorWheelImage()},
-		{"noise", GenerateNoiseImage()},
-		{"alpha_gradient", GenerateAlphaGradientImage()},
-		{"color_bands", GenerateColorBandsImage()},
-		{"edge_cases", GenerateEdgeCasesImage()},
+		{"gradient", LoadGradientImage()},
+		{"checkerboard", LoadCheckerboardImage()},
+		{"color_wheel", LoadColorWheelImage()},
+		{"noise", LoadNoiseImage()},
+		{"alpha_gradient", LoadAlphaGradientImage()},
+		{"color_bands", LoadRainbowStripsImage()},
+		{"edge_cases", LoadEdgeTestImage()},
 	}
 
 	for _, ti := range testImages {
@@ -69,105 +69,6 @@ func GenerateTestImages() error {
 	}
 
 	return nil
-}
-
-// generateGradientImage creates a gradient image with transparency
-func generateGradientImage() error {
-	const width, height = 512, 512
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			// Calculate gradient values
-			r := uint8((float64(x) / float64(width)) * 255)
-			g := uint8((float64(y) / float64(height)) * 255)
-			b := uint8(128)
-			a := uint8((float64(x+y) / float64(width+height)) * 255)
-
-			img.Set(x, y, color.NRGBA{r, g, b, a})
-		}
-	}
-
-	return saveImage(img, "test_images/gradient.png")
-}
-
-// generateCheckerboardImage creates a checkerboard pattern with transparency
-func generateCheckerboardImage() error {
-	const width, height = 512, 512
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	const squareSize = 64
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			// Calculate checkerboard pattern
-			squareX := x / squareSize
-			squareY := y / squareSize
-			isBlack := (squareX+squareY)%2 == 0
-
-			// Create semi-transparent black and white squares
-			if isBlack {
-				img.Set(x, y, color.NRGBA{0, 0, 0, 192})
-			} else {
-				img.Set(x, y, color.NRGBA{255, 255, 255, 128})
-			}
-		}
-	}
-
-	return saveImage(img, "test_images/checkerboard.png")
-}
-
-// generateColorWheelImage creates a color wheel with transparency
-func generateColorWheelImage() error {
-	const width, height = 512, 512
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	centerX, centerY := width/2, height/2
-	maxRadius := math.Min(float64(width), float64(height)) / 2
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			// Calculate polar coordinates
-			dx := float64(x - centerX)
-			dy := float64(y - centerY)
-			radius := math.Sqrt(dx*dx + dy*dy)
-			angle := math.Atan2(dy, dx)
-
-			if radius <= maxRadius {
-				// Convert angle to hue (0-360)
-				hue := (angle + math.Pi) / (2 * math.Pi)
-				// Convert to RGB
-				r, g, b := hslToRGB(hue, 1.0, 0.5)
-				// Calculate alpha based on radius
-				alpha := uint8((1 - radius/maxRadius) * 255)
-				img.Set(x, y, color.NRGBA{r, g, b, alpha})
-			} else {
-				img.Set(x, y, color.NRGBA{0, 0, 0, 0})
-			}
-		}
-	}
-
-	return saveImage(img, "test_images/color_wheel.png")
-}
-
-// generateNoiseImage creates a noise pattern with transparency
-func generateNoiseImage() error {
-	const width, height = 512, 512
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	rand.Seed(42) // Fixed seed for reproducibility
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			// Generate random values for RGB
-			r := uint8(rand.Intn(256))
-			g := uint8(rand.Intn(256))
-			b := uint8(rand.Intn(256))
-			// Generate random alpha with bias towards transparency
-			a := uint8(rand.Intn(192)) // Max 75% opacity
-
-			img.Set(x, y, color.NRGBA{r, g, b, a})
-		}
-	}
-
-	return saveImage(img, "test_images/noise.png")
 }
 
 // hslToRGB converts HSL to RGB
@@ -213,6 +114,35 @@ func hueToRGB(p, q, t float64) float64 {
 	return p
 }
 
+// loadImage loads an image from a file and converts it to NRGBA format
+func loadImage(filename string) (*image.NRGBA, error) {
+	f, err := os.Open(filepath.Join(imageTestOutputDir, filepath.Base(filename)))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to NRGBA if it isn't already
+	if nrgba, ok := img.(*image.NRGBA); ok {
+		return nrgba, nil
+	}
+
+	// Convert the image to NRGBA format
+	bounds := img.Bounds()
+	nrgba := image.NewNRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			nrgba.Set(x, y, img.At(x, y))
+		}
+	}
+	return nrgba, nil
+}
+
 // saveImage saves an image to a file
 func saveImage(img image.Image, filename string) error {
 	f, err := os.Create(filepath.Join(imageTestOutputDir, filepath.Base(filename)))
@@ -224,9 +154,70 @@ func saveImage(img image.Image, filename string) error {
 	return png.Encode(f, img)
 }
 
+func drawGrid(img *image.NRGBA, gridSize int) *image.NRGBA {
+	bounds := img.Bounds()
+	debug := image.NewNRGBA(bounds)
+
+	// Copy original image
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			debug.Set(x, y, img.NRGBAAt(x, y))
+		}
+	}
+
+	// Draw grid
+	for y := bounds.Min.Y; y < bounds.Max.Y; y += gridSize {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			debug.Set(x, y, color.NRGBA{0, 0, 0, 128})
+		}
+	}
+	for x := bounds.Min.X; x < bounds.Max.X; x += gridSize {
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			debug.Set(x, y, color.NRGBA{0, 0, 0, 128})
+		}
+	}
+	return debug
+}
+
+func drawBounds(img *image.NRGBA) *image.NRGBA {
+	bounds := img.Bounds()
+	debug := image.NewNRGBA(bounds)
+
+	// Copy original image
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			debug.Set(x, y, img.NRGBAAt(x, y))
+		}
+	}
+
+	// Draw bounds
+	for x := bounds.Min.X; x < bounds.Max.X; x++ {
+		debug.Set(x, bounds.Min.Y, color.NRGBA{255, 0, 0, 255})   // Top
+		debug.Set(x, bounds.Max.Y-1, color.NRGBA{255, 0, 0, 255}) // Bottom
+	}
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		debug.Set(bounds.Min.X, y, color.NRGBA{255, 0, 0, 255})   // Left
+		debug.Set(bounds.Max.X-1, y, color.NRGBA{255, 0, 0, 255}) // Right
+	}
+
+	// Draw center cross
+	centerX := (bounds.Min.X + bounds.Max.X) / 2
+	centerY := (bounds.Min.Y + bounds.Max.Y) / 2
+	for i := -5; i <= 5; i++ {
+		if centerX+i >= bounds.Min.X && centerX+i < bounds.Max.X {
+			debug.Set(centerX+i, centerY, color.NRGBA{0, 255, 0, 255})
+		}
+		if centerY+i >= bounds.Min.Y && centerY+i < bounds.Max.Y {
+			debug.Set(centerX, centerY+i, color.NRGBA{0, 255, 0, 255})
+		}
+	}
+
+	return debug
+}
+
 // generateTextPatternImage creates a pattern that simulates text-like structures
 func generateTextPatternImage() error {
-	const width, height = 512, 512
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Create "text-like" horizontal lines with varying thickness and spacing
@@ -252,13 +243,21 @@ func generateTextPatternImage() error {
 			}
 		}
 	}
+	return saveImage(drawBounds(drawGrid(img, 20)), "test_images/text_pattern.png")
+}
 
-	return saveImage(img, "test_images/text_pattern.png")
+// LoadTextPatternImage loads the text pattern image
+func LoadTextPatternImage() *image.NRGBA {
+	img, err := loadImage("test_images/text_pattern.png")
+	if err != nil {
+		return nil
+	}
+	return img
 }
 
 // generateConcentricsImage creates concentric circles with varying colors
 func generateConcentricsImage() error {
-	const width, height = 512, 512
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	centerX, centerY := width/2, height/2
 
@@ -283,12 +282,21 @@ func generateConcentricsImage() error {
 		}
 	}
 
-	return saveImage(img, "test_images/concentrics.png")
+	return saveImage(drawBounds(drawGrid(img, 20)), "test_images/concentrics.png")
+}
+
+// LoadConcentricsImage loads the concentrics image
+func LoadConcentricsImage() *image.NRGBA {
+	img, err := loadImage("test_images/concentrics.png")
+	if err != nil {
+		return nil
+	}
+	return img
 }
 
 // generateHighContrastImage creates a high contrast pattern
 func generateHighContrastImage() error {
-	const width, height = 512, 512
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	for y := 0; y < height; y++ {
@@ -303,12 +311,21 @@ func generateHighContrastImage() error {
 		}
 	}
 
-	return saveImage(img, "test_images/high_contrast.png")
+	return saveImage(drawBounds(drawGrid(img, 20)), "test_images/high_contrast.png")
+}
+
+// LoadHighContrastImage loads the high contrast image
+func LoadHighContrastImage() *image.NRGBA {
+	img, err := loadImage("test_images/high_contrast.png")
+	if err != nil {
+		return nil
+	}
+	return img
 }
 
 // generateRainbowStripsImage creates horizontal rainbow strips
 func generateRainbowStripsImage() error {
-	const width, height = 512, 512
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	colors := []color.NRGBA{
@@ -332,12 +349,21 @@ func generateRainbowStripsImage() error {
 		}
 	}
 
-	return saveImage(img, "test_images/rainbow_strips.png")
+	return saveImage(drawBounds(drawGrid(img, 20)), "test_images/rainbow_strips.png")
+}
+
+// LoadRainbowStripsImage loads the rainbow strips image
+func LoadRainbowStripsImage() *image.NRGBA {
+	img, err := loadImage("test_images/rainbow_strips.png")
+	if err != nil {
+		return nil
+	}
+	return img
 }
 
 // generateEdgeTestImage creates patterns good for testing edge detection
 func generateEdgeTestImage() error {
-	const width, height = 512, 512
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Draw various geometric shapes
@@ -367,12 +393,21 @@ func generateEdgeTestImage() error {
 		}
 	}
 
-	return saveImage(img, "test_images/edge_test.png")
+	return saveImage(drawBounds(drawGrid(img, 20)), "test_images/edge_test.png")
+}
+
+// LoadEdgeTestImage loads the edge test image
+func LoadEdgeTestImage() *image.NRGBA {
+	img, err := loadImage("test_images/edge_test.png")
+	if err != nil {
+		return nil
+	}
+	return img
 }
 
 // generateAlphaGradientImage creates a pattern with pure alpha gradients
 func generateAlphaGradientImage() error {
-	const width, height = 512, 512
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	for y := 0; y < height; y++ {
@@ -389,205 +424,149 @@ func generateAlphaGradientImage() error {
 		}
 	}
 
-	return saveImage(img, "test_images/alpha_gradient.png")
+	return saveImage(drawBounds(drawGrid(img, 20)), "test_images/alpha_gradient.png")
 }
 
-// GenerateAlphaGradientImage creates an image with varying alpha values
-func GenerateAlphaGradientImage() *image.NRGBA {
-	width, height := 256, 256
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-
-	for y := 0; y < height; y++ {
-		alpha := uint8((y * 255) / height)
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.NRGBA{
-				R: 255,
-				G: 255,
-				B: 255,
-				A: alpha,
-			})
-		}
+// LoadAlphaGradientImage loads the alpha gradient image
+func LoadAlphaGradientImage() *image.NRGBA {
+	img, err := loadImage("test_images/alpha_gradient.png")
+	if err != nil {
+		return nil
 	}
 	return img
 }
 
-// GenerateColorBandsImage creates an image with distinct color bands
-func GenerateColorBandsImage() *image.NRGBA {
-	width, height := 256, 256
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-
-	bandHeight := height / 8
-	colors := []color.NRGBA{
-		{255, 0, 0, 255},     // Red
-		{0, 255, 0, 255},     // Green
-		{0, 0, 255, 255},     // Blue
-		{255, 255, 0, 255},   // Yellow
-		{255, 0, 255, 255},   // Magenta
-		{0, 255, 255, 255},   // Cyan
-		{255, 255, 255, 255}, // White
-		{0, 0, 0, 255},       // Black
-	}
-
-	for i, c := range colors {
-		for y := i * bandHeight; y < (i+1)*bandHeight; y++ {
-			for x := 0; x < width; x++ {
-				img.Set(x, y, c)
-			}
-		}
-	}
-	return img
-}
-
-// GenerateEdgeCasesImage creates an image with various edge cases
-func GenerateEdgeCasesImage() *image.NRGBA {
-	width, height := 256, 256
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-
-	// Fill with white
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.NRGBA{255, 255, 255, 255})
-		}
-	}
-
-	// Add various edge cases
-	// 1. Single pixel in each corner
-	img.Set(0, 0, color.NRGBA{255, 0, 0, 255})                // Top-left
-	img.Set(width-1, 0, color.NRGBA{0, 255, 0, 255})          // Top-right
-	img.Set(0, height-1, color.NRGBA{0, 0, 255, 255})         // Bottom-left
-	img.Set(width-1, height-1, color.NRGBA{255, 255, 0, 255}) // Bottom-right
-
-	// 2. Vertical and horizontal lines
-	for y := 0; y < height; y++ {
-		img.Set(width/2, y, color.NRGBA{0, 0, 0, 255}) // Vertical line
-	}
-	for x := 0; x < width; x++ {
-		img.Set(x, height/2, color.NRGBA{0, 0, 0, 255}) // Horizontal line
-	}
-
-	// 3. Checkerboard pattern in center
-	for y := height / 4; y < 3*height/4; y++ {
-		for x := width / 4; x < 3*width/4; x++ {
-			if (x+y)%2 == 0 {
-				img.Set(x, y, color.NRGBA{0, 0, 0, 255})
-			}
-		}
-	}
-
-	return img
-}
-
-// GenerateGradientImage creates a gradient image with transparency
-func GenerateGradientImage() *image.NRGBA {
-	width, height := 256, 256
+// generateGradientImage creates a gradient image with transparency
+func generateGradientImage() error {
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			// Calculate normalized positions
-			xNorm := float64(x) / float64(width)
-			yNorm := float64(y) / float64(height)
-
-			// Create smooth gradients for each channel
-			r := uint8(255 * xNorm)
-			g := uint8(255 * yNorm)
+			// Calculate gradient values
+			r := uint8((float64(x) / float64(width)) * 255)
+			g := uint8((float64(y) / float64(height)) * 255)
 			b := uint8(128)
-			// Alpha gradient from top-left to bottom-right
-			a := uint8(255 * (1 - (xNorm+yNorm)/2))
-
-			// Pre-multiply RGB values by alpha
-			r = uint8(float64(r) * float64(a) / 255)
-			g = uint8(float64(g) * float64(a) / 255)
-			b = uint8(float64(b) * float64(a) / 255)
+			a := uint8((float64(x+y) / float64(width+height)) * 255)
 
 			img.Set(x, y, color.NRGBA{r, g, b, a})
 		}
 	}
-	return img
+
+	return saveImage(img, "test_images/gradient.png")
 }
 
-// GenerateCheckerboardImage creates a checkerboard pattern with transparency
-func GenerateCheckerboardImage() *image.NRGBA {
-	width, height := 256, 256
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	squareSize := 32
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			squareX := x / squareSize
-			squareY := y / squareSize
-			// Alternate between opaque and semi-transparent squares
-			if (squareX+squareY)%2 == 0 {
-				img.Set(x, y, color.NRGBA{0, 0, 0, 255}) // Opaque black
-			} else {
-				img.Set(x, y, color.NRGBA{255, 255, 255, 128}) // Semi-transparent white
-			}
-		}
+// LoadGradientImage loads the gradient image
+func LoadGradientImage() *image.NRGBA {
+	img, err := loadImage("test_images/gradient.png")
+	if err != nil {
+		return nil
 	}
 	return img
 }
 
-// GenerateColorWheelImage creates a color wheel image with transparency
-func GenerateColorWheelImage() *image.NRGBA {
-	width, height := 256, 256
+// generateCheckerboardImage creates a checkerboard pattern with transparency
+func generateCheckerboardImage() error {
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	centerX, centerY := width/2, height/2
-	maxRadius := float64(width) / 2
+	const squareSize = 64
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
+			// Calculate checkerboard pattern
+			squareX := x / squareSize
+			squareY := y / squareSize
+			isBlack := (squareX+squareY)%2 == 0
+
+			// Create semi-transparent black and white squares
+			if isBlack {
+				img.Set(x, y, color.NRGBA{0, 0, 0, 192})
+			} else {
+				img.Set(x, y, color.NRGBA{255, 255, 255, 128})
+			}
+		}
+	}
+
+	return saveImage(img, "test_images/checkerboard.png")
+}
+
+// LoadGradientImage loads the checkerboard image
+func LoadCheckerboardImage() *image.NRGBA {
+	img, err := loadImage("test_images/checkerboard.png")
+	if err != nil {
+		return nil
+	}
+	return img
+}
+
+// generateColorWheelImage creates a color wheel with transparency
+func generateColorWheelImage() error {
+	const width, height = 256, 256
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	centerX, centerY := width/2, height/2
+	maxRadius := math.Min(float64(width), float64(height)) / 2
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// Calculate polar coordinates
 			dx := float64(x - centerX)
 			dy := float64(y - centerY)
 			radius := math.Sqrt(dx*dx + dy*dy)
+			angle := math.Atan2(dy, dx)
 
 			if radius <= maxRadius {
-				angle := math.Atan2(dy, dx)
-				if angle < 0 {
-					angle += 2 * math.Pi
-				}
-
-				// Calculate alpha based on distance from center
-				alpha := uint8(255 * (1 - radius/maxRadius))
-
-				// Convert angle to hue (0-1)
-				hue := angle / (2 * math.Pi)
+				// Convert angle to hue (0-360)
+				hue := (angle + math.Pi) / (2 * math.Pi)
+				// Convert to RGB
 				r, g, b := hslToRGB(hue, 1.0, 0.5)
-
-				// Pre-multiply RGB values by alpha
-				r = uint8(float64(r) * float64(alpha) / 255)
-				g = uint8(float64(g) * float64(alpha) / 255)
-				b = uint8(float64(b) * float64(alpha) / 255)
-
+				// Calculate alpha based on radius
+				alpha := uint8((1 - radius/maxRadius) * 255)
 				img.Set(x, y, color.NRGBA{r, g, b, alpha})
 			} else {
-				img.Set(x, y, color.NRGBA{0, 0, 0, 0}) // Fully transparent outside the wheel
+				img.Set(x, y, color.NRGBA{0, 0, 0, 0})
 			}
 		}
+	}
+
+	return saveImage(img, "test_images/color_wheel.png")
+}
+
+// LoadColorWheelImage loads the color wheel image
+func LoadColorWheelImage() *image.NRGBA {
+	img, err := loadImage("test_images/color_wheel.png")
+	if err != nil {
+		return nil
 	}
 	return img
 }
 
-// GenerateNoiseImage creates a noise pattern with varying transparency
-func GenerateNoiseImage() *image.NRGBA {
-	width, height := 256, 256
+// generateNoiseImage creates a noise pattern with transparency
+func generateNoiseImage() error {
+	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	rand.Seed(42) // Fixed seed for reproducibility
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			// Generate random values including alpha
+			// Generate random values for RGB
 			r := uint8(rand.Intn(256))
 			g := uint8(rand.Intn(256))
 			b := uint8(rand.Intn(256))
-			a := uint8(rand.Intn(256)) // Random transparency
-
-			// Pre-multiply RGB values by alpha
-			r = uint8(float64(r) * float64(a) / 255)
-			g = uint8(float64(g) * float64(a) / 255)
-			b = uint8(float64(b) * float64(a) / 255)
+			// Generate random alpha with bias towards transparency
+			a := uint8(rand.Intn(192)) // Max 75% opacity
 
 			img.Set(x, y, color.NRGBA{r, g, b, a})
 		}
+	}
+
+	return saveImage(img, "test_images/noise.png")
+}
+
+// LoadNoiseImage loads the noise image
+func LoadNoiseImage() *image.NRGBA {
+	img, err := loadImage("test_images/noise.png")
+	if err != nil {
+		return nil
 	}
 	return img
 }

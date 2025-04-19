@@ -135,7 +135,8 @@ func createTestLanguage() {
 			return z, nil
 		},
 	)
-	dsl.funcs.register("img-nrgba64", "This is a function to process an NRGBA64 image",
+	dsl.funcs.register(
+		"img-nrgba64", "This is a function to process an NRGBA64 image",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA64", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA64", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
@@ -149,7 +150,8 @@ func createTestLanguage() {
 			return img, nil
 		},
 	)
-	dsl.funcs.register("img-rgba64", "This is another function to process an RGBA64 image",
+	dsl.funcs.register(
+		"img-rgba64", "This is another function to process an RGBA64 image",
 		[]dslParamMeta{{name: "img", typ: "*image.RGBA64", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
@@ -163,7 +165,8 @@ func createTestLanguage() {
 			return img, nil
 		},
 	)
-	dsl.funcs.register("img-nrgba", "This is a function to process an NRGBA image",
+	dsl.funcs.register(
+		"img-nrgba", "This is a function to process an NRGBA image",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
@@ -177,7 +180,8 @@ func createTestLanguage() {
 			return img, nil
 		},
 	)
-	dsl.funcs.register("img-rgba", "This is another function to process an RGBA image",
+	dsl.funcs.register(
+		"img-rgba", "This is another function to process an RGBA image",
 		[]dslParamMeta{{name: "img", typ: "*image.RGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The converted image"}},
 		func(a ...any) (any, error) {
@@ -191,7 +195,8 @@ func createTestLanguage() {
 			return img, nil
 		},
 	)
-	dsl.funcs.register("load", "This is a function to load RGBA images",
+	dsl.funcs.register(
+		"load", "This is a function to load RGBA images",
 		[]dslParamMeta{{name: "src", typ: "string", desc: "The image file to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The image"}},
 		func(a ...any) (any, error) {
@@ -221,7 +226,8 @@ func createTestLanguage() {
 			return nil, fmt.Errorf("unsupported image format: %T (must be NRGBA or RGBA)", img)
 		},
 	)
-	dsl.funcs.register("save", "This is a function to save RGBA images",
+	dsl.funcs.register(
+		"save", "This is a function to save RGBA images",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to save"}, {name: "path", typ: "string", desc: "The file to write to"}},
 		[]dslParamMeta{{name: "res", typ: "bool", def: false, desc: "Whether saving was successful"}},
 		func(a ...any) (any, error) {
@@ -236,7 +242,8 @@ func createTestLanguage() {
 			return img, nil
 		},
 	)
-	dsl.funcs.register("invert", "Inverts the image",
+	dsl.funcs.register(
+		"invert", "Inverts the image",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The inverted image"}},
 		func(a ...any) (any, error) {
@@ -258,7 +265,8 @@ func createTestLanguage() {
 			return inverted, nil
 		},
 	)
-	dsl.funcs.register("grayscale", "Converts the image to grayscale",
+	dsl.funcs.register(
+		"grayscale", "Converts the image to grayscale",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The grayscale image"}},
 		func(a ...any) (any, error) {
@@ -282,7 +290,8 @@ func createTestLanguage() {
 			return grayscaled, nil
 		},
 	)
-	dsl.funcs.register("brightness", "Adjusts the brightness of the image",
+	dsl.funcs.register(
+		"brightness", "Adjusts the brightness of the image",
 		[]dslParamMeta{
 			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
 			{name: "factor", typ: "float64", desc: "Brightness adjustment factor (0.0 to 2.0, 1.0 is original)"},
@@ -313,7 +322,8 @@ func createTestLanguage() {
 			return adjusted, nil
 		},
 	)
-	dsl.funcs.register("sepia", "Applies a sepia tone effect to the image",
+	dsl.funcs.register(
+		"sepia", "Applies a sepia tone effect to the image",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The sepia-toned image"}},
 		func(a ...any) (any, error) {
@@ -343,7 +353,8 @@ func createTestLanguage() {
 			return sepia, nil
 		},
 	)
-	dsl.funcs.register("blur", "Applies a simple box blur to the image",
+	dsl.funcs.register(
+		"blur", "Applies a simple box blur to the image",
 		[]dslParamMeta{
 			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
 			{name: "radius", typ: "int", desc: "Blur radius (1-10)"},
@@ -389,7 +400,8 @@ func createTestLanguage() {
 			return blurred, nil
 		},
 	)
-	dsl.funcs.register("debug-alpha", "Visualizes the alpha channel as grayscale",
+	dsl.funcs.register(
+		"debug-alpha", "Visualizes the alpha channel as grayscale",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The alpha visualization"}},
 		func(a ...any) (any, error) {
@@ -411,30 +423,8 @@ func createTestLanguage() {
 			return debug, nil
 		},
 	)
-	dsl.funcs.register("debug-channels", "Visualizes each color channel separately",
-		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
-		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The channel visualization"}},
-		func(a ...any) (any, error) {
-			img := a[0].(*image.NRGBA)
-			bounds := img.Bounds()
-			debug := image.NewNRGBA(bounds)
-
-			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-				for x := bounds.Min.X; x < bounds.Max.X; x++ {
-					c := img.NRGBAAt(x, y)
-					// R channel in red, G in green, B in blue
-					debug.Set(x, y, color.NRGBA{
-						R: c.R,
-						G: c.G,
-						B: c.B,
-						A: 255,
-					})
-				}
-			}
-			return debug, nil
-		},
-	)
-	dsl.funcs.register("debug-bounds", "Highlights the image bounds and center",
+	dsl.funcs.register(
+		"debug-bounds", "Highlights the image bounds and center",
 		[]dslParamMeta{{name: "img", typ: "*image.NRGBA", desc: "The image to process"}},
 		[]dslParamMeta{{name: "res", typ: "*image.NRGBA", def: false, desc: "The bounds visualization"}},
 		func(a ...any) (any, error) {
@@ -474,7 +464,8 @@ func createTestLanguage() {
 			return debug, nil
 		},
 	)
-	dsl.funcs.register("debug-grid", "Overlays a grid on the image",
+	dsl.funcs.register(
+		"debug-grid", "Overlays a grid on the image",
 		[]dslParamMeta{
 			{name: "img", typ: "*image.NRGBA", desc: "The image to process"},
 			{name: "size", typ: "int", desc: "Grid size in pixels"},
@@ -1430,6 +1421,9 @@ func TestImageProcessing(t *testing.T) {
 			name   string
 			script string
 		}{
+			{"debug-alpha", `save(debug-alpha(load(%q)) %q)`},
+			{"debug-bounds", `save(debug-bounds(load(%q)) %q)`},
+			{"debug-grid", `save(debug-grid(load(%q) 10) %q)`},
 			{"invert", `save(invert(load(%q)) %q)`},
 			{"grayscale", `save(grayscale(load(%q)) %q)`},
 			{"sepia", `save(sepia(load(%q)) %q)`},

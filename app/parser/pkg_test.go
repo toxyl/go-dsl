@@ -444,33 +444,40 @@ func createTestLanguage() {
 					c1 := imgA.RGBAAt(x, y)
 					c2 := imgB.RGBAAt(x, y)
 
-					// Convert to float for precision
-					a1 := float64(c1.A) / 255.0
-					r1 := float64(c1.R) / 255.0
-					g1 := float64(c1.G) / 255.0
-					b1 := float64(c1.B) / 255.0
+					// Work with 16-bit precision for intermediate calculations
+					a1 := uint32(c1.A)
+					r1 := uint32(c1.R)
+					g1 := uint32(c1.G)
+					b1 := uint32(c1.B)
 
-					a2 := float64(c2.A) / 255.0
-					r2 := float64(c2.R) / 255.0
-					g2 := float64(c2.G) / 255.0
-					b2 := float64(c2.B) / 255.0
+					a2 := uint32(c2.A)
+					r2 := uint32(c2.R)
+					g2 := uint32(c2.G)
+					b2 := uint32(c2.B)
 
 					// Porter-Duff alpha compositing
-					aOut := a1 + a2 - (a1 * a2)
+					aOut := a1 + a2 - ((a1 * a2) / 255)
 
-					var rOut, gOut, bOut float64
+					var rOut, gOut, bOut uint32
 					if aOut > 0 {
-						// Standard multiply blend formula
-						rOut = (r1 * r2) + (r1 * (1 - a2)) + (r2 * (1 - a1))
-						gOut = (g1 * g2) + (g1 * (1 - a2)) + (g2 * (1 - a1))
-						bOut = (b1 * b2) + (b1 * (1 - a2)) + (b2 * (1 - a1))
+						// Multiply blend mode with minimal conversions
+						// For each channel: (c1 * c2) + (c1 * (255 - a2)) + (c2 * (255 - a1)) all in fixed point
+						rOut = ((r1 * r2) + (r1 * (255 - a2)) + (r2 * (255 - a1))) / 255
+						gOut = ((g1 * g2) + (g1 * (255 - a2)) + (g2 * (255 - a1))) / 255
+						bOut = ((b1 * b2) + (b1 * (255 - a2)) + (b2 * (255 - a1))) / 255
 					}
 
+					// Clamp to valid range
+					rOut = min(rOut, 255)
+					gOut = min(gOut, 255)
+					bOut = min(bOut, 255)
+					aOut = min(aOut, 255)
+
 					result.SetRGBA(x, y, color.RGBA{
-						R: uint8(rOut * 255.0),
-						G: uint8(gOut * 255.0),
-						B: uint8(bOut * 255.0),
-						A: uint8(aOut * 255.0),
+						R: uint8(rOut),
+						G: uint8(gOut),
+						B: uint8(bOut),
+						A: uint8(aOut),
 					})
 				}
 			}

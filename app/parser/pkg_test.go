@@ -403,25 +403,25 @@ func createTestLanguage() {
 	dsl.funcs.register(
 		"blend-multiply", "Overlays two images using the multiply blendmode",
 		[]dslParamMeta{
-			{name: "imgA", typ: "*image.RGBA", desc: "The lower image"},
-			{name: "imgB", typ: "*image.RGBA", desc: "The upper image"},
+			{name: "imgA", typ: "*image.RGBA64", desc: "The lower image"},
+			{name: "imgB", typ: "*image.RGBA64", desc: "The upper image"},
 		},
-		[]dslParamMeta{{name: "res", typ: "*image.RGBA", def: false, desc: "The blended images"}},
+		[]dslParamMeta{{name: "res", typ: "*image.RGBA64", def: false, desc: "The blended images"}},
 		func(a ...any) (any, error) {
-			imgA := a[0].(*image.RGBA)
-			imgB := a[1].(*image.RGBA)
+			imgA := a[0].(*image.RGBA64)
+			imgB := a[1].(*image.RGBA64)
 
 			// Create a new image with the same bounds
 			bounds := imgA.Bounds()
-			result := image.NewRGBA(bounds)
+			result := image.NewRGBA64(bounds)
 
 			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 				for x := bounds.Min.X; x < bounds.Max.X; x++ {
 					// Get premultiplied colors
-					c1 := imgA.RGBAAt(x, y)
-					c2 := imgB.RGBAAt(x, y)
+					c1 := imgA.RGBA64At(x, y)
+					c2 := imgB.RGBA64At(x, y)
 
-					// Work with 16-bit precision for intermediate calculations
+					// Work with 32-bit precision for intermediate calculations
 					a1 := uint32(c1.A)
 					r1 := uint32(c1.R)
 					g1 := uint32(c1.G)
@@ -433,28 +433,28 @@ func createTestLanguage() {
 					b2 := uint32(c2.B)
 
 					// Porter-Duff alpha compositing
-					aOut := a1 + a2 - ((a1 * a2) / 255)
+					aOut := a1 + a2 - ((a1 * a2) / 0xffff)
 
 					var rOut, gOut, bOut uint32
 					if aOut > 0 {
 						// Multiply blend mode with minimal conversions
-						// For each channel: (c1 * c2) + (c1 * (255 - a2)) + (c2 * (255 - a1)) all in fixed point
-						rOut = ((r1 * r2) + (r1 * (255 - a2)) + (r2 * (255 - a1))) / 255
-						gOut = ((g1 * g2) + (g1 * (255 - a2)) + (g2 * (255 - a1))) / 255
-						bOut = ((b1 * b2) + (b1 * (255 - a2)) + (b2 * (255 - a1))) / 255
+						// For each channel: (c1 * c2) + (c1 * (0xffff - a2)) + (c2 * (0xffff - a1)) all in fixed point
+						rOut = ((r1 * r2) + (r1 * (0xffff - a2)) + (r2 * (0xffff - a1))) / 0xffff
+						gOut = ((g1 * g2) + (g1 * (0xffff - a2)) + (g2 * (0xffff - a1))) / 0xffff
+						bOut = ((b1 * b2) + (b1 * (0xffff - a2)) + (b2 * (0xffff - a1))) / 0xffff
 					}
 
 					// Clamp to valid range
-					rOut = min(rOut, 255)
-					gOut = min(gOut, 255)
-					bOut = min(bOut, 255)
-					aOut = min(aOut, 255)
+					rOut = min(rOut, 0xffff)
+					gOut = min(gOut, 0xffff)
+					bOut = min(bOut, 0xffff)
+					aOut = min(aOut, 0xffff)
 
-					result.SetRGBA(x, y, color.RGBA{
-						R: uint8(rOut),
-						G: uint8(gOut),
-						B: uint8(bOut),
-						A: uint8(aOut),
+					result.SetRGBA64(x, y, color.RGBA64{
+						R: uint16(rOut),
+						G: uint16(gOut),
+						B: uint16(bOut),
+						A: uint16(aOut),
 					})
 				}
 			}

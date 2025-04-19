@@ -342,6 +342,10 @@ func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
 			return v, nil
 		case "*image.RGBA":
 			return dsl.convertNRGBAToRGBA(v), nil
+		case "*image.NRGBA64":
+			return dsl.convertNRGBAToNRGBA64(v), nil
+		case "*image.RGBA64":
+			return dsl.convertNRGBAToRGBA64(v), nil
 		}
 	case *image.RGBA:
 		switch targetType {
@@ -349,6 +353,10 @@ func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
 			return dsl.convertRGBAToNRGBA(v), nil
 		case "*image.RGBA":
 			return v, nil
+		case "*image.NRGBA64":
+			return dsl.convertRGBAToNRGBA64(v), nil
+		case "*image.RGBA64":
+			return dsl.convertRGBAToRGBA64(v), nil
 		}
 	case *image.RGBA64:
 		switch targetType {
@@ -356,6 +364,10 @@ func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
 			return v, nil
 		case "*image.NRGBA64":
 			return dsl.convertRGBA64ToNRGBA64(v), nil
+		case "*image.RGBA":
+			return dsl.convertRGBA64ToRGBA(v), nil
+		case "*image.NRGBA":
+			return dsl.convertRGBA64ToNRGBA(v), nil
 		}
 	case *image.NRGBA64:
 		switch targetType {
@@ -363,6 +375,10 @@ func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
 			return dsl.convertNRGBA64ToRGBA64(v), nil
 		case "*image.NRGBA64":
 			return v, nil
+		case "*image.RGBA":
+			return dsl.convertNRGBA64ToRGBA(v), nil
+		case "*image.NRGBA":
+			return dsl.convertNRGBA64ToNRGBA(v), nil
 		}
 	}
 	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
@@ -412,13 +428,201 @@ func (dsl *dslCollection) convertRGBAToNRGBA(src *image.RGBA) *image.NRGBA {
 func (dsl *dslCollection) convertRGBA64ToNRGBA64(src *image.RGBA64) *image.NRGBA64 {
 	bounds := src.Bounds()
 	dst := image.NewNRGBA64(bounds)
-	copy(dst.Pix, src.Pix)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.RGBA64At(x, y)
+			if c.A == 0 {
+				dst.Set(x, y, color.NRGBA64{0, 0, 0, 0})
+				continue
+			}
+			// Convert from premultiplied to non-premultiplied alpha
+			dst.Set(x, y, color.NRGBA64{
+				R: uint16((uint32(c.R) * 0xffff) / uint32(c.A)),
+				G: uint16((uint32(c.G) * 0xffff) / uint32(c.A)),
+				B: uint16((uint32(c.B) * 0xffff) / uint32(c.A)),
+				A: c.A,
+			})
+		}
+	}
 	return dst
 }
 
 func (dsl *dslCollection) convertNRGBA64ToRGBA64(src *image.NRGBA64) *image.RGBA64 {
 	bounds := src.Bounds()
 	dst := image.NewRGBA64(bounds)
-	copy(dst.Pix, src.Pix)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.NRGBA64At(x, y)
+			// Convert to premultiplied alpha
+			dst.Set(x, y, color.RGBA64{
+				R: uint16((uint32(c.R) * uint32(c.A)) / 0xffff),
+				G: uint16((uint32(c.G) * uint32(c.A)) / 0xffff),
+				B: uint16((uint32(c.B) * uint32(c.A)) / 0xffff),
+				A: c.A,
+			})
+		}
+	}
+	return dst
+}
+
+// convertNRGBAToNRGBA64 converts an 8-bit non-premultiplied RGBA image to 16-bit
+func (dsl *dslCollection) convertNRGBAToNRGBA64(src *image.NRGBA) *image.NRGBA64 {
+	bounds := src.Bounds()
+	dst := image.NewNRGBA64(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.NRGBAAt(x, y)
+			dst.Set(x, y, color.NRGBA64{
+				R: uint16(c.R) * 257, // Scale from 8-bit to 16-bit (257 = 65535/255)
+				G: uint16(c.G) * 257,
+				B: uint16(c.B) * 257,
+				A: uint16(c.A) * 257,
+			})
+		}
+	}
+	return dst
+}
+
+// convertRGBAToRGBA64 converts an 8-bit premultiplied RGBA image to 16-bit
+func (dsl *dslCollection) convertRGBAToRGBA64(src *image.RGBA) *image.RGBA64 {
+	bounds := src.Bounds()
+	dst := image.NewRGBA64(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.RGBAAt(x, y)
+			dst.Set(x, y, color.RGBA64{
+				R: uint16(c.R) * 257,
+				G: uint16(c.G) * 257,
+				B: uint16(c.B) * 257,
+				A: uint16(c.A) * 257,
+			})
+		}
+	}
+	return dst
+}
+
+// convertRGBAToNRGBA64 converts an 8-bit premultiplied RGBA image to 16-bit non-premultiplied
+func (dsl *dslCollection) convertRGBAToNRGBA64(src *image.RGBA) *image.NRGBA64 {
+	bounds := src.Bounds()
+	dst := image.NewNRGBA64(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.RGBAAt(x, y)
+			if c.A == 0 {
+				dst.Set(x, y, color.NRGBA64{0, 0, 0, 0})
+				continue
+			}
+			// First unpremultiply 8-bit values, then convert to 16-bit
+			dst.Set(x, y, color.NRGBA64{
+				R: uint16((uint32(c.R) * 0xff * 257) / uint32(c.A)),
+				G: uint16((uint32(c.G) * 0xff * 257) / uint32(c.A)),
+				B: uint16((uint32(c.B) * 0xff * 257) / uint32(c.A)),
+				A: uint16(c.A) * 257,
+			})
+		}
+	}
+	return dst
+}
+
+// convertNRGBA64ToNRGBA converts a 16-bit non-premultiplied RGBA image to 8-bit
+func (dsl *dslCollection) convertNRGBA64ToNRGBA(src *image.NRGBA64) *image.NRGBA {
+	bounds := src.Bounds()
+	dst := image.NewNRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.NRGBA64At(x, y)
+			dst.Set(x, y, color.NRGBA{
+				R: uint8(c.R >> 8), // Scale from 16-bit to 8-bit
+				G: uint8(c.G >> 8),
+				B: uint8(c.B >> 8),
+				A: uint8(c.A >> 8),
+			})
+		}
+	}
+	return dst
+}
+
+// convertRGBA64ToRGBA converts a 16-bit premultiplied RGBA image to 8-bit
+func (dsl *dslCollection) convertRGBA64ToRGBA(src *image.RGBA64) *image.RGBA {
+	bounds := src.Bounds()
+	dst := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.RGBA64At(x, y)
+			dst.Set(x, y, color.RGBA{
+				R: uint8(c.R >> 8),
+				G: uint8(c.G >> 8),
+				B: uint8(c.B >> 8),
+				A: uint8(c.A >> 8),
+			})
+		}
+	}
+	return dst
+}
+
+// convertRGBA64ToNRGBA converts a 16-bit premultiplied RGBA image to 8-bit non-premultiplied
+func (dsl *dslCollection) convertRGBA64ToNRGBA(src *image.RGBA64) *image.NRGBA {
+	bounds := src.Bounds()
+	dst := image.NewNRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.RGBA64At(x, y)
+			if c.A == 0 {
+				dst.Set(x, y, color.NRGBA{0, 0, 0, 0})
+				continue
+			}
+			// Unpremultiply and convert to 8-bit
+			dst.Set(x, y, color.NRGBA{
+				R: uint8((uint32(c.R) * 0xffff) / uint32(c.A) >> 8),
+				G: uint8((uint32(c.G) * 0xffff) / uint32(c.A) >> 8),
+				B: uint8((uint32(c.B) * 0xffff) / uint32(c.A) >> 8),
+				A: uint8(c.A >> 8),
+			})
+		}
+	}
+	return dst
+}
+
+// convertNRGBA64ToRGBA converts a 16-bit non-premultiplied RGBA image to 8-bit premultiplied
+func (dsl *dslCollection) convertNRGBA64ToRGBA(src *image.NRGBA64) *image.RGBA {
+	bounds := src.Bounds()
+	dst := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.NRGBA64At(x, y)
+			// Convert to 8-bit and premultiply
+			a8 := uint8(c.A >> 8)
+			dst.Set(x, y, color.RGBA{
+				R: uint8((uint32(c.R) * uint32(a8)) / 0xff >> 8),
+				G: uint8((uint32(c.G) * uint32(a8)) / 0xff >> 8),
+				B: uint8((uint32(c.B) * uint32(a8)) / 0xff >> 8),
+				A: a8,
+			})
+		}
+	}
+	return dst
+}
+
+// convertNRGBAToRGBA64 converts an 8-bit non-premultiplied RGBA image to 16-bit premultiplied
+func (dsl *dslCollection) convertNRGBAToRGBA64(src *image.NRGBA) *image.RGBA64 {
+	bounds := src.Bounds()
+	dst := image.NewRGBA64(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			c := src.NRGBAAt(x, y)
+			// First convert to 16-bit, then premultiply
+			r16 := uint16(c.R) * 257
+			g16 := uint16(c.G) * 257
+			b16 := uint16(c.B) * 257
+			a16 := uint16(c.A) * 257
+
+			dst.Set(x, y, color.RGBA64{
+				R: uint16((uint32(r16) * uint32(a16)) / 0xffff),
+				G: uint16((uint32(g16) * uint32(a16)) / 0xffff),
+				B: uint16((uint32(b16) * uint32(a16)) / 0xffff),
+				A: a16,
+			})
+		}
+	}
 	return dst
 }

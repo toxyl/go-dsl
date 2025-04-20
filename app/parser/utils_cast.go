@@ -644,6 +644,32 @@ func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
 				B: uint16(v.B) * 257,
 				A: uint16(v.A) * 257,
 			}, nil
+		case "color.NRGBA":
+			// Convert from premultiplied to non-premultiplied alpha
+			if v.A == 0 {
+				return color.NRGBA{0, 0, 0, 0}, nil
+			}
+			return color.NRGBA{
+				R: uint8((uint32(v.R) * 255) / uint32(v.A)),
+				G: uint8((uint32(v.G) * 255) / uint32(v.A)),
+				B: uint8((uint32(v.B) * 255) / uint32(v.A)),
+				A: v.A,
+			}, nil
+		case "color.NRGBA64":
+			// Convert from premultiplied to non-premultiplied alpha
+			if v.A == 0 {
+				return color.NRGBA64{0, 0, 0, 0}, nil
+			}
+			r16 := uint16(v.R) * 257
+			g16 := uint16(v.G) * 257
+			b16 := uint16(v.B) * 257
+			a16 := uint16(v.A) * 257
+			return color.NRGBA64{
+				R: uint16((uint32(r16) * 0xffff) / uint32(a16)),
+				G: uint16((uint32(g16) * 0xffff) / uint32(a16)),
+				B: uint16((uint32(b16) * 0xffff) / uint32(a16)),
+				A: a16,
+			}, nil
 		}
 	case color.RGBA64:
 		switch targetType {
@@ -656,6 +682,89 @@ func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
 			}, nil
 		case "color.RGBA64":
 			return v, nil
+		case "color.NRGBA":
+			// Convert from premultiplied to non-premultiplied alpha
+			if v.A == 0 {
+				return color.NRGBA{0, 0, 0, 0}, nil
+			}
+			return color.NRGBA{
+				R: uint8((uint32(v.R) * 255) / uint32(v.A>>8)),
+				G: uint8((uint32(v.G) * 255) / uint32(v.A>>8)),
+				B: uint8((uint32(v.B) * 255) / uint32(v.A>>8)),
+				A: uint8(v.A >> 8),
+			}, nil
+		case "color.NRGBA64":
+			// Convert from premultiplied to non-premultiplied alpha
+			if v.A == 0 {
+				return color.NRGBA64{0, 0, 0, 0}, nil
+			}
+			return color.NRGBA64{
+				R: uint16((uint32(v.R) * 0xffff) / uint32(v.A)),
+				G: uint16((uint32(v.G) * 0xffff) / uint32(v.A)),
+				B: uint16((uint32(v.B) * 0xffff) / uint32(v.A)),
+				A: v.A,
+			}, nil
+		}
+	case color.NRGBA:
+		switch targetType {
+		case "color.NRGBA":
+			return v, nil
+		case "color.NRGBA64":
+			return color.NRGBA64{
+				R: uint16(v.R) * 257,
+				G: uint16(v.G) * 257,
+				B: uint16(v.B) * 257,
+				A: uint16(v.A) * 257,
+			}, nil
+		case "color.RGBA":
+			// Convert from non-premultiplied to premultiplied alpha
+			return color.RGBA{
+				R: uint8((uint32(v.R) * uint32(v.A)) / 255),
+				G: uint8((uint32(v.G) * uint32(v.A)) / 255),
+				B: uint8((uint32(v.B) * uint32(v.A)) / 255),
+				A: v.A,
+			}, nil
+		case "color.RGBA64":
+			// Convert from non-premultiplied to premultiplied alpha
+			r16 := uint16(v.R) * 257
+			g16 := uint16(v.G) * 257
+			b16 := uint16(v.B) * 257
+			a16 := uint16(v.A) * 257
+			return color.RGBA64{
+				R: uint16((uint32(r16) * uint32(a16)) / 0xffff),
+				G: uint16((uint32(g16) * uint32(a16)) / 0xffff),
+				B: uint16((uint32(b16) * uint32(a16)) / 0xffff),
+				A: a16,
+			}, nil
+		}
+	case color.NRGBA64:
+		switch targetType {
+		case "color.NRGBA64":
+			return v, nil
+		case "color.NRGBA":
+			return color.NRGBA{
+				R: uint8(v.R >> 8),
+				G: uint8(v.G >> 8),
+				B: uint8(v.B >> 8),
+				A: uint8(v.A >> 8),
+			}, nil
+		case "color.RGBA":
+			// Convert from non-premultiplied to premultiplied alpha
+			a8 := uint8(v.A >> 8)
+			return color.RGBA{
+				R: uint8((uint32(v.R) * uint32(a8)) / 0xff >> 8),
+				G: uint8((uint32(v.G) * uint32(a8)) / 0xff >> 8),
+				B: uint8((uint32(v.B) * uint32(a8)) / 0xff >> 8),
+				A: a8,
+			}, nil
+		case "color.RGBA64":
+			// Convert from non-premultiplied to premultiplied alpha
+			return color.RGBA64{
+				R: uint16((uint32(v.R) * uint32(v.A)) / 0xffff),
+				G: uint16((uint32(v.G) * uint32(v.A)) / 0xffff),
+				B: uint16((uint32(v.B) * uint32(v.A)) / 0xffff),
+				A: v.A,
+			}, nil
 		}
 	}
 	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)

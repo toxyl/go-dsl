@@ -61,7 +61,7 @@ func (data *initTemplate) generateVarRegistrations(variables []metaVar) (require
 		switch v.typ {
 		case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
 			requiredImports = append(requiredImports, "image")
-		case "color.RGBA", "color.RGBA64":
+		case "color.RGBA", "color.RGBA64", "color.NRGBA", "color.NRGBA64":
 			requiredImports = append(requiredImports, "image/color")
 		}
 		data.VarRegistry = append(data.VarRegistry, initTemplateVar{
@@ -92,7 +92,7 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (requi
 			switch param.typ {
 			case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
 				requiredImports = append(requiredImports, "image")
-			case "color.RGBA", "color.RGBA64":
+			case "color.RGBA", "color.RGBA64", "color.NRGBA", "color.NRGBA64":
 				requiredImports = append(requiredImports, "image/color")
 			}
 
@@ -111,7 +111,7 @@ func (data *initTemplate) generateFuncRegistrations(functions []metaFunc) (requi
 			switch ret.typ {
 			case "*image.RGBA", "*image.NRGBA", "*image.RGBA64", "*image.NRGBA64":
 				requiredImports = append(requiredImports, "image")
-			case "color.RGBA", "color.RGBA64":
+			case "color.RGBA", "color.RGBA64", "color.NRGBA", "color.NRGBA64":
 				requiredImports = append(requiredImports, "image/color")
 			}
 

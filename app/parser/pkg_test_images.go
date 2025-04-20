@@ -231,12 +231,12 @@ func generateTextPatternImage() error {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Create "text-like" horizontal lines with varying thickness and spacing
-	for y := 0; y < height; y++ {
+	for y := range height {
 		// Determine if we're in a "text line" region
 		lineRegion := (y/40)%3 == 0
 		if lineRegion {
 			wordStart := 0
-			for x := 0; x < width; x++ {
+			for x := range width {
 				// Create "word-like" blocks
 				if x >= wordStart && x < wordStart+rand.Intn(50)+20 {
 					img.Set(x, y, color.NRGBA{0, 0, 0, 255})
@@ -248,7 +248,7 @@ func generateTextPatternImage() error {
 				}
 			}
 		} else {
-			for x := 0; x < width; x++ {
+			for x := range width {
 				img.Set(x, y, color.NRGBA{255, 255, 255, 255})
 			}
 		}
@@ -262,8 +262,8 @@ func generateConcentricsImage() error {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	centerX, centerY := width/2, height/2
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			dx := float64(x - centerX)
 			dy := float64(y - centerY)
 			distance := math.Sqrt(dx*dx + dy*dy)
@@ -291,8 +291,8 @@ func generateHighContrastImage() error {
 	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Create a complex pattern with high contrast
 			val := math.Sin(float64(x)/10) * math.Cos(float64(y)/10)
 			if val > 0 {
@@ -322,12 +322,12 @@ func generateRainbowStripsImage() error {
 	}
 
 	stripHeight := height / len(colors)
-	for y := 0; y < height; y++ {
+	for y := range height {
 		colorIndex := y / stripHeight
 		if colorIndex >= len(colors) {
 			colorIndex = len(colors) - 1
 		}
-		for x := 0; x < width; x++ {
+		for x := range width {
 			img.Set(x, y, colors[colorIndex])
 		}
 	}
@@ -341,8 +341,8 @@ func generateEdgeDetectionImage() error {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Draw various geometric shapes
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Default to white
 			c := color.NRGBA{255, 255, 255, 255}
 
@@ -376,8 +376,8 @@ func generateEdgeCasesImage() error {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Fill with white
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			img.Set(x, y, color.NRGBA{255, 255, 255, 255})
 		}
 	}
@@ -390,10 +390,10 @@ func generateEdgeCasesImage() error {
 	img.Set(width-1, height-1, color.NRGBA{255, 255, 0, 255}) // Bottom-right
 
 	// 2. Vertical and horizontal lines
-	for y := 0; y < height; y++ {
+	for y := range height {
 		img.Set(width/2, y, color.NRGBA{0, 0, 0, 255}) // Vertical line
 	}
-	for x := 0; x < width; x++ {
+	for x := range width {
 		img.Set(x, height/2, color.NRGBA{0, 0, 0, 255}) // Horizontal line
 	}
 	// 3. Checkerboard pattern in center
@@ -413,8 +413,8 @@ func generateAlphaGradientImage() error {
 	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Create a radial alpha gradient
 			dx := float64(x - width/2)
 			dy := float64(y - height/2)
@@ -435,8 +435,8 @@ func generateGradientImage() error {
 	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Calculate gradient values
 			r := uint8((float64(x) / float64(width)) * 255)
 			g := uint8((float64(y) / float64(height)) * 255)
@@ -456,8 +456,8 @@ func generateCheckerboardImage() error {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	const squareSize = 64
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Calculate checkerboard pattern
 			squareX := x / squareSize
 			squareY := y / squareSize
@@ -482,8 +482,8 @@ func generateColorWheelImage() error {
 	centerX, centerY := width/2, height/2
 	maxRadius := math.Min(float64(width), float64(height)) / 2
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Calculate polar coordinates
 			dx := float64(x - centerX)
 			dy := float64(y - centerY)
@@ -511,10 +511,9 @@ func generateColorWheelImage() error {
 func generateNoiseImage() error {
 	const width, height = 256, 256
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	rand.Seed(42) // Fixed seed for reproducibility
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Generate random values for RGB
 			r := uint8(rand.Intn(256))
 			g := uint8(rand.Intn(256))

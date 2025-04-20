@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"os"
 	"path/filepath"
 	"sort"
@@ -505,11 +506,15 @@ func (dsl *dslCollection) shell() {
 		}
 
 		// Print the result
+		resStr := ""
 		switch result.value.(type) {
+		case color.RGBA, color.RGBA64, color.NRGBA, color.NRGBA64:
+			resStr = dsl.shellResultColor(result.value.(color.Color))
 		case *image.RGBA, *image.NRGBA, *image.RGBA64, *image.NRGBA64:
-			fmt.Printf("\x1b[32m┃ %v\x1b[0m\n", "image")
+			resStr = dsl.shellResultImage(result.value.(image.Image))
 		default:
-			fmt.Printf("\x1b[32m┃ %v\x1b[0m\n", result.value)
+			resStr = fmt.Sprint(result.value)
 		}
+		fmt.Printf("\x1b[32m┃ %v\x1b[0m\n", resStr)
 	}
 }

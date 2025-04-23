@@ -268,7 +268,387 @@ func (dsl *dslCollection) docText() string {
 	return dsl.renderMarkdownToTerminal(dsl.docMarkdown())
 }
 
+func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
+	// Create the language definition structure
+	langDef := map[string]any{
+		"grammar": map[string]any{
+			"$schema":   "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+			"name":      dsl.name,
+			"scopeName": "source." + dsl.id,
+			"patterns": []map[string]any{
+				{
+					"name":  "comment.block",
+					"begin": "#",
+					"end":   "#",
+					"patterns": []map[string]any{
+						{
+							"match": "\\\\#",
+							"name":  "constant.character.escape",
+						},
+					},
+				},
+				{
+					"name":  "string.quoted.double",
+					"begin": "\"",
+					"end":   "\"",
+					"patterns": []map[string]any{
+						{
+							"name":  "constant.character.escape",
+							"match": "\\\\.",
+						},
+					},
+				},
+				{
+					"name":  "constant.numeric",
+					"match": "\\b\\d+(\\.\\d+)?\\b",
+				},
+				{
+					"name":  "constant.language.boolean",
+					"match": "\\b(true|false)\\b",
+				},
+				{
+					"name":  "constant.language.null",
+					"match": "\\bnil\\b",
+				},
+				{
+					"name":  "variable.parameter",
+					"match": "\\$\\d+",
+				},
+				{
+					"name":  "variable.assign",
+					"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*[:=])",
+				},
+				{
+					"name":  "keyword.operator.assignment",
+					"match": "[:=]",
+				},
+				{
+					"name":  "entity.name.function",
+					"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*\\()",
+				},
+				{
+					"name":  "variable.other",
+					"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
+				},
+			},
+		},
+		"configuration": map[string]any{
+			"comments": map[string]string{
+				"blockComment": "#",
+			},
+			"brackets": [][]string{
+				{"(", ")"},
+			},
+			"autoClosingPairs": []map[string]string{
+				{"open": "(", "close": ")"},
+				{"open": "\"", "close": "\""},
+			},
+			"surroundingPairs": []map[string]string{
+				{"open": "(", "close": ")"},
+				{"open": "\"", "close": "\""},
+			},
+		},
+		"snippets": map[string]any{
+			"Function Call": map[string]any{
+				"prefix":      "func",
+				"body":        []string{"${1:functionName}(${2:arg1} ${3:arg2})"},
+				"description": "Create a function call",
+			},
+			"Variable Assignment": map[string]any{
+				"prefix":      "var",
+				"body":        []string{"${1:variableName}: ${2:value}"},
+				"description": "Create a variable assignment",
+			},
+			"String Literal": map[string]any{
+				"prefix":      "str",
+				"body":        []string{"\"${1:text}\""},
+				"description": "Create a string literal",
+			},
+			"Comment": map[string]any{
+				"prefix":      "//",
+				"body":        []string{"# ${1:comment} #"},
+				"description": "Create a comment",
+			},
+		},
+		"completions": map[string]any{
+			"functions": dsl.generateFunctionCode(),
+			"variables": dsl.generateVariableCode(),
+		},
+		"theme": map[string]any{
+			"$schema": "vscode://schemas/color-theme",
+			"name":    dsl.name + " Theme",
+			"type":    "dark",
+			"colors": map[string]string{
+				"editor.background": dsl.theme.EditorBackground,
+				"editor.foreground": dsl.theme.EditorForeground,
+			},
+			"tokenColors": []map[string]any{
+				{
+					"name":  "Comments",
+					"scope": "comment",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Comments,
+					},
+				},
+				{
+					"name":  "Block Comments",
+					"scope": "comment.block",
+					"settings": map[string]string{
+						"foreground": dsl.theme.BlockComments,
+					},
+				},
+				{
+					"name":  "Line Comments",
+					"scope": "comment.line",
+					"settings": map[string]string{
+						"foreground": dsl.theme.LineComments,
+					},
+				},
+				{
+					"name":  "Strings",
+					"scope": "string.quoted.double",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Strings,
+					},
+				},
+				{
+					"name":  "Single Quoted Strings",
+					"scope": "string.quoted.single",
+					"settings": map[string]string{
+						"foreground": dsl.theme.SingleQuotedStrings,
+					},
+				},
+				{
+					"name":  "Rune Strings",
+					"scope": "string.quoted.rune",
+					"settings": map[string]string{
+						"foreground": dsl.theme.RuneStrings,
+					},
+				},
+				{
+					"name":  "Raw Strings",
+					"scope": "string.quoted.raw",
+					"settings": map[string]string{
+						"foreground": dsl.theme.RawStrings,
+					},
+				},
+				{
+					"name":  "Numbers",
+					"scope": "constant.numeric",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Numbers,
+					},
+				},
+				{
+					"name":  "Constants",
+					"scope": "constant.language",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Constants,
+					},
+				},
+				{
+					"name":  "Functions",
+					"scope": "entity.name.function",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Functions,
+					},
+				},
+				{
+					"name":  "Variable Assignments",
+					"scope": "variable.assign",
+					"settings": map[string]string{
+						"foreground": dsl.theme.VariableAssignments,
+					},
+				},
+				{
+					"name":  "Assignment Operators",
+					"scope": "keyword.operator.assignment",
+					"settings": map[string]string{
+						"foreground": dsl.theme.AssignmentOperators,
+					},
+				},
+				{
+					"name":  "Types",
+					"scope": "entity.name.type",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Types,
+					},
+				},
+				{
+					"name":  "Classes",
+					"scope": "entity.name.class",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Classes,
+					},
+				},
+				{
+					"name":  "Packages",
+					"scope": "entity.name.namespace",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Packages,
+					},
+				},
+				{
+					"name":  "Variables",
+					"scope": "variable.other",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Variables,
+					},
+				},
+				{
+					"name":  "Parameters",
+					"scope": "variable.parameter",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Parameters,
+					},
+				},
+				{
+					"name":  "Properties",
+					"scope": "variable.other.property",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Properties,
+					},
+				},
+				{
+					"name":  "Keywords",
+					"scope": "keyword",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Keywords,
+					},
+				},
+				{
+					"name":  "Control Keywords",
+					"scope": "keyword.control",
+					"settings": map[string]string{
+						"foreground": dsl.theme.ControlKeywords,
+					},
+				},
+				{
+					"name":  "Operators",
+					"scope": "keyword.operator",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Operators,
+					},
+				},
+				{
+					"name":  "Arithmetic Operators",
+					"scope": "keyword.operator.arithmetic",
+					"settings": map[string]string{
+						"foreground": dsl.theme.ArithmeticOperators,
+					},
+				},
+				{
+					"name":  "Comparison Operators",
+					"scope": "keyword.operator.comparison",
+					"settings": map[string]string{
+						"foreground": dsl.theme.ComparisonOperators,
+					},
+				},
+				{
+					"name":  "Address Operators",
+					"scope": "keyword.operator.address",
+					"settings": map[string]string{
+						"foreground": dsl.theme.AddressOperators,
+					},
+				},
+				{
+					"name":  "Other Keywords",
+					"scope": "keyword.other",
+					"settings": map[string]string{
+						"foreground": dsl.theme.OtherKeywords,
+					},
+				},
+				{
+					"name":  "Storage Types",
+					"scope": "storage.type",
+					"settings": map[string]string{
+						"foreground": dsl.theme.StorageTypes,
+					},
+				},
+				{
+					"name":  "Storage Type Modifiers",
+					"scope": "storage.type.modifier",
+					"settings": map[string]string{
+						"foreground": dsl.theme.StorageTypeModifiers,
+					},
+				},
+				{
+					"name":  "Storage Modifiers",
+					"scope": "storage.modifier",
+					"settings": map[string]string{
+						"foreground": dsl.theme.StorageModifiers,
+					},
+				},
+				{
+					"name":  "Support Types",
+					"scope": "support.type",
+					"settings": map[string]string{
+						"foreground": dsl.theme.SupportTypes,
+					},
+				},
+				{
+					"name":  "Support Functions",
+					"scope": "support.function",
+					"settings": map[string]string{
+						"foreground": dsl.theme.SupportFunctions,
+					},
+				},
+				{
+					"name":  "Support Classes",
+					"scope": "support.class",
+					"settings": map[string]string{
+						"foreground": dsl.theme.SupportClasses,
+					},
+				},
+				{
+					"name":  "Support Constants",
+					"scope": "support.constant",
+					"settings": map[string]string{
+						"foreground": dsl.theme.SupportConstants,
+					},
+				},
+				{
+					"name":  "Support Variables",
+					"scope": "support.variable",
+					"settings": map[string]string{
+						"foreground": dsl.theme.SupportVariables,
+					},
+				},
+				{
+					"name":  "Escape Characters",
+					"scope": "constant.character.escape",
+					"settings": map[string]string{
+						"foreground": dsl.theme.EscapeCharacters,
+					},
+				},
+				{
+					"name":  "Tags",
+					"scope": "entity.name.tag",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Tags,
+					},
+				},
+				{
+					"name":  "Attributes",
+					"scope": "entity.other.attribute-name",
+					"settings": map[string]string{
+						"foreground": dsl.theme.Attributes,
+					},
+				},
+			},
+		},
+	}
+
+	return langDef, nil
+}
+
 func (dsl *dslCollection) exportVSCodeExtension(pathToVSIXFile string) error {
+	// Get the complete language definition
+	langDef, err := dsl.GetLanguageDefinition()
+	if err != nil {
+		return fmt.Errorf("failed to get language definition: %w", err)
+	}
+
 	// Create fixed temporary directory for extension files
 	tmpDir := filepath.Join(os.TempDir(), "vscode-extension"+dsl.id)
 
@@ -365,389 +745,23 @@ func (dsl *dslCollection) exportVSCodeExtension(pathToVSIXFile string) error {
 		return err
 	}
 
-	// Generate language configuration
-	langConfig := map[string]any{
-		"comments": map[string]string{
-			"blockComment": "#",
-		},
-		"brackets": [][]string{
-			{"(", ")"},
-		},
-		"autoClosingPairs": []map[string]string{
-			{"open": "(", "close": ")"},
-			{"open": "\"", "close": "\""},
-		},
-		"surroundingPairs": []map[string]string{
-			{"open": "(", "close": ")"},
-			{"open": "\"", "close": "\""},
-		},
-	}
-
-	if err := dsl.writeJSON(filepath.Join(tmpDir, "language-configuration.json"), langConfig); err != nil {
+	// Write language configuration
+	if err := dsl.writeJSON(filepath.Join(tmpDir, "language-configuration.json"), langDef["configuration"]); err != nil {
 		return err
 	}
 
-	// Generate snippets
-	snippets := map[string]any{
-		"Function Call": map[string]any{
-			"prefix":      "func",
-			"body":        []string{"${1:functionName}(${2:arg1} ${3:arg2})"},
-			"description": "Create a function call",
-		},
-		"Variable Assignment": map[string]any{
-			"prefix":      "var",
-			"body":        []string{"${1:variableName}: ${2:value}"},
-			"description": "Create a variable assignment",
-		},
-		"String Literal": map[string]any{
-			"prefix":      "str",
-			"body":        []string{"\"${1:text}\""},
-			"description": "Create a string literal",
-		},
-		"Comment": map[string]any{
-			"prefix":      "//",
-			"body":        []string{"# ${1:comment} #"},
-			"description": "Create a comment",
-		},
-	}
-
-	if err := dsl.writeJSON(filepath.Join(tmpDir, "snippets", "snippets.json"), snippets); err != nil {
+	// Write snippets
+	if err := dsl.writeJSON(filepath.Join(tmpDir, "snippets", "snippets.json"), langDef["snippets"]); err != nil {
 		return err
 	}
 
-	// Generate TextMate grammar
-	grammar := map[string]any{
-		"$schema":   "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-		"name":      dsl.name,
-		"scopeName": "source." + dsl.id,
-		"patterns": []map[string]any{
-			{
-				"name":  "comment.block",
-				"begin": "#",
-				"end":   "#",
-				"patterns": []map[string]any{
-					{
-						"match": "\\\\#",
-						"name":  "constant.character.escape",
-					},
-				},
-			},
-			{
-				"name":  "string.quoted.double",
-				"begin": "\"",
-				"end":   "\"",
-				"patterns": []map[string]any{
-					{
-						"name":  "constant.character.escape",
-						"match": "\\\\.",
-					},
-				},
-			},
-			{
-				"name":  "constant.numeric",
-				"match": "\\b\\d+(\\.\\d+)?\\b",
-			},
-			{
-				"name":  "constant.language.boolean",
-				"match": "\\b(true|false)\\b",
-			},
-			{
-				"name":  "constant.language.null",
-				"match": "\\bnil\\b",
-			},
-			{
-				"name":  "variable.parameter",
-				"match": "\\$\\d+",
-			},
-			{
-				"name":  "variable.assign",
-				"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*[:=])",
-			},
-			{
-				"name":  "keyword.operator.assignment",
-				"match": "[:=]",
-			},
-			{
-				"name":  "entity.name.function",
-				"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*\\()",
-			},
-			{
-				"name":  "variable.other",
-				"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
-			},
-		},
-	}
-
-	if err := dsl.writeJSON(filepath.Join(tmpDir, "syntaxes", dsl.id+".tmLanguage.json"), grammar); err != nil {
+	// Write grammar
+	if err := dsl.writeJSON(filepath.Join(tmpDir, "syntaxes", dsl.id+".tmLanguage.json"), langDef["grammar"]); err != nil {
 		return fmt.Errorf("failed to write grammar file: %w", err)
 	}
 
-	// Generate color theme
-	themeConfig := map[string]any{
-		"$schema": "vscode://schemas/color-theme",
-		"name":    dsl.name + " Theme",
-		"type":    "dark",
-		"colors": map[string]string{
-			"editor.background": dsl.theme.EditorBackground,
-			"editor.foreground": dsl.theme.EditorForeground,
-		},
-		"tokenColors": []map[string]any{
-			{
-				"name":  "Comments",
-				"scope": "comment",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Comments,
-				},
-			},
-			{
-				"name":  "Block Comments",
-				"scope": "comment.block",
-				"settings": map[string]string{
-					"foreground": dsl.theme.BlockComments,
-				},
-			},
-			{
-				"name":  "Line Comments",
-				"scope": "comment.line",
-				"settings": map[string]string{
-					"foreground": dsl.theme.LineComments,
-				},
-			},
-			{
-				"name":  "Strings",
-				"scope": "string.quoted.double",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Strings,
-				},
-			},
-			{
-				"name":  "Single Quoted Strings",
-				"scope": "string.quoted.single",
-				"settings": map[string]string{
-					"foreground": dsl.theme.SingleQuotedStrings,
-				},
-			},
-			{
-				"name":  "Rune Strings",
-				"scope": "string.quoted.rune",
-				"settings": map[string]string{
-					"foreground": dsl.theme.RuneStrings,
-				},
-			},
-			{
-				"name":  "Raw Strings",
-				"scope": "string.quoted.raw",
-				"settings": map[string]string{
-					"foreground": dsl.theme.RawStrings,
-				},
-			},
-			{
-				"name":  "Numbers",
-				"scope": "constant.numeric",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Numbers,
-				},
-			},
-			{
-				"name":  "Constants",
-				"scope": "constant.language",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Constants,
-				},
-			},
-			{
-				"name":  "Functions",
-				"scope": "entity.name.function",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Functions,
-				},
-			},
-			{
-				"name":  "Variable Assignments",
-				"scope": "variable.assign",
-				"settings": map[string]string{
-					"foreground": dsl.theme.VariableAssignments,
-				},
-			},
-			{
-				"name":  "Assignment Operators",
-				"scope": "keyword.operator.assignment",
-				"settings": map[string]string{
-					"foreground": dsl.theme.AssignmentOperators,
-				},
-			},
-			{
-				"name":  "Types",
-				"scope": "entity.name.type",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Types,
-				},
-			},
-			{
-				"name":  "Classes",
-				"scope": "entity.name.class",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Classes,
-				},
-			},
-			{
-				"name":  "Packages",
-				"scope": "entity.name.namespace",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Packages,
-				},
-			},
-			{
-				"name":  "Variables",
-				"scope": "variable.other",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Variables,
-				},
-			},
-			{
-				"name":  "Parameters",
-				"scope": "variable.parameter",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Parameters,
-				},
-			},
-			{
-				"name":  "Properties",
-				"scope": "variable.other.property",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Properties,
-				},
-			},
-			{
-				"name":  "Keywords",
-				"scope": "keyword",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Keywords,
-				},
-			},
-			{
-				"name":  "Control Keywords",
-				"scope": "keyword.control",
-				"settings": map[string]string{
-					"foreground": dsl.theme.ControlKeywords,
-				},
-			},
-			{
-				"name":  "Operators",
-				"scope": "keyword.operator",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Operators,
-				},
-			},
-			{
-				"name":  "Arithmetic Operators",
-				"scope": "keyword.operator.arithmetic",
-				"settings": map[string]string{
-					"foreground": dsl.theme.ArithmeticOperators,
-				},
-			},
-			{
-				"name":  "Comparison Operators",
-				"scope": "keyword.operator.comparison",
-				"settings": map[string]string{
-					"foreground": dsl.theme.ComparisonOperators,
-				},
-			},
-			{
-				"name":  "Address Operators",
-				"scope": "keyword.operator.address",
-				"settings": map[string]string{
-					"foreground": dsl.theme.AddressOperators,
-				},
-			},
-			{
-				"name":  "Other Keywords",
-				"scope": "keyword.other",
-				"settings": map[string]string{
-					"foreground": dsl.theme.OtherKeywords,
-				},
-			},
-			{
-				"name":  "Storage Types",
-				"scope": "storage.type",
-				"settings": map[string]string{
-					"foreground": dsl.theme.StorageTypes,
-				},
-			},
-			{
-				"name":  "Storage Type Modifiers",
-				"scope": "storage.type.modifier",
-				"settings": map[string]string{
-					"foreground": dsl.theme.StorageTypeModifiers,
-				},
-			},
-			{
-				"name":  "Storage Modifiers",
-				"scope": "storage.modifier",
-				"settings": map[string]string{
-					"foreground": dsl.theme.StorageModifiers,
-				},
-			},
-			{
-				"name":  "Support Types",
-				"scope": "support.type",
-				"settings": map[string]string{
-					"foreground": dsl.theme.SupportTypes,
-				},
-			},
-			{
-				"name":  "Support Functions",
-				"scope": "support.function",
-				"settings": map[string]string{
-					"foreground": dsl.theme.SupportFunctions,
-				},
-			},
-			{
-				"name":  "Support Classes",
-				"scope": "support.class",
-				"settings": map[string]string{
-					"foreground": dsl.theme.SupportClasses,
-				},
-			},
-			{
-				"name":  "Support Constants",
-				"scope": "support.constant",
-				"settings": map[string]string{
-					"foreground": dsl.theme.SupportConstants,
-				},
-			},
-			{
-				"name":  "Support Variables",
-				"scope": "support.variable",
-				"settings": map[string]string{
-					"foreground": dsl.theme.SupportVariables,
-				},
-			},
-			{
-				"name":  "Escape Characters",
-				"scope": "constant.character.escape",
-				"settings": map[string]string{
-					"foreground": dsl.theme.EscapeCharacters,
-				},
-			},
-			{
-				"name":  "Tags",
-				"scope": "entity.name.tag",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Tags,
-				},
-			},
-			{
-				"name":  "Attributes",
-				"scope": "entity.other.attribute-name",
-				"settings": map[string]string{
-					"foreground": dsl.theme.Attributes,
-				},
-			},
-		},
-	}
-
-	if err := dsl.writeJSON(filepath.Join(tmpDir, "themes", dsl.id+"-color-theme.json"), themeConfig); err != nil {
+	// Write theme
+	if err := dsl.writeJSON(filepath.Join(tmpDir, "themes", dsl.id+"-color-theme.json"), langDef["theme"]); err != nil {
 		return fmt.Errorf("failed to write theme file: %w", err)
 	}
 
@@ -825,7 +839,7 @@ export class CustomCompletionProvider implements vscode.CompletionItemProvider {
     ): vscode.ProviderResult<vscode.CompletionItem> {
         return item;
     }
-}`, dsl.generateFunctionCode(), dsl.generateVariableCode())
+}`, langDef["completions"].(map[string]any)["functions"], langDef["completions"].(map[string]any)["variables"])
 
 	if err := flo.File(filepath.Join(tmpDir, "src", "completionProvider.ts")).StoreString(completionProvider); err != nil {
 		return fmt.Errorf("failed to write completion provider: %w", err)

@@ -34,6 +34,16 @@ func (dsl *dslCollection) contains(str, search string) bool {
 }
 
 func (dsl *dslCollection) onlyDigits(str string) bool {
+	if len(str) == 0 {
+		return false
+	}
+	// Handle negative numbers
+	if str[0] == '-' {
+		if len(str) == 1 {
+			return false // Just a minus sign is not a valid number
+		}
+		str = str[1:] // Skip the minus sign and check the rest
+	}
 	for _, c := range str {
 		if !dsl.isDigit(byte(c)) {
 			return false

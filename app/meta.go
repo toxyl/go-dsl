@@ -42,6 +42,30 @@ func extractFunctionMeta(node *ast.File, functions []metaFunc) []metaFunc {
 			if fn.Doc == nil {
 				continue
 			}
+
+			// check doc comments to see if this is actually an annotated function
+			isAnnotated := false
+			for _, comment := range fn.Doc.List {
+				text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
+
+				if strings.HasPrefix(text, "@") {
+					parts := strings.SplitN(text[1:], ":", 2)
+					if len(parts) < 2 {
+						continue
+					}
+					switch strings.TrimSpace(parts[0]) {
+					case "Name", "Desc", "Param", "Returns":
+						isAnnotated = true
+					}
+				}
+				if isAnnotated {
+					break
+				}
+			}
+			if !isAnnotated {
+				continue
+			}
+
 			types := map[string]string{}
 			if fn.Type != nil && fn.Type.Params != nil && fn.Type.Params.List != nil {
 				for _, param := range fn.Type.Params.List {

@@ -265,6 +265,94 @@ func (dsl *dslCollection) setColor(img image.Image, x, y int, r, g, b, a uint32)
 	}
 }
 
+func (dsl *dslCollection) setColorRedChannel(img image.Image, x, y int, r uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		t.Pix[t.PixOffset(x, y)] = uint8(r)
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i] = uint8(r >> 8)
+		t.Pix[i+1] = uint8(r)
+	case *image.RGBA:
+		t.Pix[t.PixOffset(x, y)] = uint8(r)
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i] = uint8(r >> 8)
+		t.Pix[i+1] = uint8(r)
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) setColorGreenChannel(img image.Image, x, y int, g uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		t.Pix[t.PixOffset(x, y)+1] = uint8(g)
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i+2] = uint8(g >> 8)
+		t.Pix[i+3] = uint8(g)
+	case *image.RGBA:
+		t.Pix[t.PixOffset(x, y)+1] = uint8(g)
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i+2] = uint8(g >> 8)
+		t.Pix[i+3] = uint8(g)
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) setColorBlueChannel(img image.Image, x, y int, b uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		t.Pix[t.PixOffset(x, y)+2] = uint8(b)
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i+4] = uint8(b >> 8)
+		t.Pix[i+5] = uint8(b)
+	case *image.RGBA:
+		t.Pix[t.PixOffset(x, y)+2] = uint8(b)
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i+4] = uint8(b >> 8)
+		t.Pix[i+5] = uint8(b)
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) setColorAlphaChannel(img image.Image, x, y int, a uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		t.Pix[t.PixOffset(x, y)+3] = uint8(a)
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i+6] = uint8(a >> 8)
+		t.Pix[i+7] = uint8(a)
+	case *image.RGBA:
+		t.Pix[t.PixOffset(x, y)+3] = uint8(a)
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		t.Pix[i+6] = uint8(a >> 8)
+		t.Pix[i+7] = uint8(a)
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
 func (dsl *dslCollection) parallelProcessNRGBA64(img image.Image, processor dslPixelProcessor, numWorkers int) (result *image.NRGBA64) {
 	return dslParallelProcessImage[*image.NRGBA64](img, processor, numWorkers).(*image.NRGBA64)
 }

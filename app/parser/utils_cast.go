@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -389,245 +390,166 @@ func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
 
 // Helper functions for image conversions
 func (dsl *dslCollection) convertNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
-	bounds := src.Bounds()
-	dst := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.NRGBAAt(x, y)
-			// Convert to premultiplied alpha
-			dst.Set(x, y, color.RGBA{
-				R: uint8(uint32(c.R) * uint32(c.A) / 255),
-				G: uint8(uint32(c.G) * uint32(c.A) / 255),
-				B: uint8(uint32(c.B) * uint32(c.A) / 255),
-				A: c.A,
-			})
-		}
-	}
-	return dst
+	return dsl.parallelProcessRGBA(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		r = r1 * a1 / 255
+		g = g1 * a1 / 255
+		b = b1 * a1 / 255
+		a = a1
+		return
+	}, runtime.NumCPU())
 }
 
 func (dsl *dslCollection) convertRGBAToNRGBA(src *image.RGBA) *image.NRGBA {
-	bounds := src.Bounds()
-	dst := image.NewNRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.RGBAAt(x, y)
-			if c.A == 0 {
-				dst.Set(x, y, color.NRGBA{0, 0, 0, 0})
-				continue
-			}
-			// Convert from premultiplied to non-premultiplied alpha
-			dst.Set(x, y, color.NRGBA{
-				R: uint8(uint32(c.R) * 255 / uint32(c.A)),
-				G: uint8(uint32(c.G) * 255 / uint32(c.A)),
-				B: uint8(uint32(c.B) * 255 / uint32(c.A)),
-				A: c.A,
-			})
+	return dsl.parallelProcessNRGBA(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = r1 * 255 / a1
+		g = g1 * 255 / a1
+		b = b1 * 255 / a1
+		a = a1
+		return
+	}, runtime.NumCPU())
 }
 
 func (dsl *dslCollection) convertRGBA64ToNRGBA64(src *image.RGBA64) *image.NRGBA64 {
-	bounds := src.Bounds()
-	dst := image.NewNRGBA64(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.RGBA64At(x, y)
-			if c.A == 0 {
-				dst.Set(x, y, color.NRGBA64{0, 0, 0, 0})
-				continue
-			}
-			// Convert from premultiplied to non-premultiplied alpha
-			dst.Set(x, y, color.NRGBA64{
-				R: uint16((uint32(c.R) * 0xffff) / uint32(c.A)),
-				G: uint16((uint32(c.G) * 0xffff) / uint32(c.A)),
-				B: uint16((uint32(c.B) * 0xffff) / uint32(c.A)),
-				A: c.A,
-			})
+	return dsl.parallelProcessNRGBA64(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = (r1 * 0xFFFF) / a1
+		g = (g1 * 0xFFFF) / a1
+		b = (b1 * 0xFFFF) / a1
+		a = a1
+		return
+	}, runtime.NumCPU())
 }
 
 func (dsl *dslCollection) convertNRGBA64ToRGBA64(src *image.NRGBA64) *image.RGBA64 {
-	bounds := src.Bounds()
-	dst := image.NewRGBA64(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.NRGBA64At(x, y)
-			// Convert to premultiplied alpha
-			dst.Set(x, y, color.RGBA64{
-				R: uint16((uint32(c.R) * uint32(c.A)) / 0xffff),
-				G: uint16((uint32(c.G) * uint32(c.A)) / 0xffff),
-				B: uint16((uint32(c.B) * uint32(c.A)) / 0xffff),
-				A: c.A,
-			})
+	return dsl.parallelProcessRGBA64(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = (r1 * a1) / 0xFFFF
+		g = (g1 * a1) / 0xFFFF
+		b = (b1 * a1) / 0xFFFF
+		a = a1
+		return
+	}, runtime.NumCPU())
 }
 
 // convertNRGBAToNRGBA64 converts an 8-bit non-premultiplied RGBA image to 16-bit
 func (dsl *dslCollection) convertNRGBAToNRGBA64(src *image.NRGBA) *image.NRGBA64 {
-	bounds := src.Bounds()
-	dst := image.NewNRGBA64(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.NRGBAAt(x, y)
-			dst.Set(x, y, color.NRGBA64{
-				R: uint16(c.R) * 257, // Scale from 8-bit to 16-bit (257 = 65535/255)
-				G: uint16(c.G) * 257,
-				B: uint16(c.B) * 257,
-				A: uint16(c.A) * 257,
-			})
+	return dsl.parallelProcessNRGBA64(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = r1 * 257 // Scale from 8-bit to 16-bit (257 = 65535/255)
+		g = g1 * 257
+		b = b1 * 257
+		a = a1
+		return
+	}, runtime.NumCPU())
 }
 
 // convertRGBAToRGBA64 converts an 8-bit premultiplied RGBA image to 16-bit
 func (dsl *dslCollection) convertRGBAToRGBA64(src *image.RGBA) *image.RGBA64 {
-	bounds := src.Bounds()
-	dst := image.NewRGBA64(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.RGBAAt(x, y)
-			dst.Set(x, y, color.RGBA64{
-				R: uint16(c.R) * 257,
-				G: uint16(c.G) * 257,
-				B: uint16(c.B) * 257,
-				A: uint16(c.A) * 257,
-			})
+	return dsl.parallelProcessRGBA64(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = r1 * 257 // Scale from 8-bit to 16-bit (257 = 65535/255)
+		g = g1 * 257
+		b = b1 * 257
+		a = a1
+		return
+	}, runtime.NumCPU())
 }
 
 // convertRGBAToNRGBA64 converts an 8-bit premultiplied RGBA image to 16-bit non-premultiplied
 func (dsl *dslCollection) convertRGBAToNRGBA64(src *image.RGBA) *image.NRGBA64 {
-	bounds := src.Bounds()
-	dst := image.NewNRGBA64(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.RGBAAt(x, y)
-			if c.A == 0 {
-				dst.Set(x, y, color.NRGBA64{0, 0, 0, 0})
-				continue
-			}
-			// First unpremultiply 8-bit values, then convert to 16-bit
-			dst.Set(x, y, color.NRGBA64{
-				R: uint16((uint32(c.R) * 0xff * 257) / uint32(c.A)),
-				G: uint16((uint32(c.G) * 0xff * 257) / uint32(c.A)),
-				B: uint16((uint32(c.B) * 0xff * 257) / uint32(c.A)),
-				A: uint16(c.A) * 257,
-			})
+	return dsl.parallelProcessNRGBA64(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = (r1 * 0xFFFF) / a1
+		g = (g1 * 0xFFFF) / a1
+		b = (b1 * 0xFFFF) / a1
+		a = a1 * 257
+		return
+	}, runtime.NumCPU())
 }
 
 // convertNRGBA64ToNRGBA converts a 16-bit non-premultiplied RGBA image to 8-bit
 func (dsl *dslCollection) convertNRGBA64ToNRGBA(src *image.NRGBA64) *image.NRGBA {
-	bounds := src.Bounds()
-	dst := image.NewNRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.NRGBA64At(x, y)
-			dst.Set(x, y, color.NRGBA{
-				R: uint8(c.R >> 8), // Scale from 16-bit to 8-bit
-				G: uint8(c.G >> 8),
-				B: uint8(c.B >> 8),
-				A: uint8(c.A >> 8),
-			})
+	return dsl.parallelProcessNRGBA(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = (r1 >> 8)
+		g = (g1 >> 8)
+		b = (b1 >> 8)
+		a = (a1 >> 8)
+		return
+	}, runtime.NumCPU())
 }
 
 // convertRGBA64ToRGBA converts a 16-bit premultiplied RGBA image to 8-bit
 func (dsl *dslCollection) convertRGBA64ToRGBA(src *image.RGBA64) *image.RGBA {
-	bounds := src.Bounds()
-	dst := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.RGBA64At(x, y)
-			dst.Set(x, y, color.RGBA{
-				R: uint8(c.R >> 8),
-				G: uint8(c.G >> 8),
-				B: uint8(c.B >> 8),
-				A: uint8(c.A >> 8),
-			})
+	return dsl.parallelProcessRGBA(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = (r1 >> 8)
+		g = (g1 >> 8)
+		b = (b1 >> 8)
+		a = (a1 >> 8)
+		return
+	}, runtime.NumCPU())
 }
 
 // convertRGBA64ToNRGBA converts a 16-bit premultiplied RGBA image to 8-bit non-premultiplied
 func (dsl *dslCollection) convertRGBA64ToNRGBA(src *image.RGBA64) *image.NRGBA {
-	bounds := src.Bounds()
-	dst := image.NewNRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.RGBA64At(x, y)
-			if c.A == 0 {
-				dst.Set(x, y, color.NRGBA{0, 0, 0, 0})
-				continue
-			}
-			// Unpremultiply and convert to 8-bit
-			dst.Set(x, y, color.NRGBA{
-				R: uint8((uint32(c.R) * 0xffff) / uint32(c.A) >> 8),
-				G: uint8((uint32(c.G) * 0xffff) / uint32(c.A) >> 8),
-				B: uint8((uint32(c.B) * 0xffff) / uint32(c.A) >> 8),
-				A: uint8(c.A >> 8),
-			})
+	return dsl.parallelProcessNRGBA(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		r = (r1 * 0xFFFF) / (a1 >> 8)
+		g = (g1 * 0xFFFF) / (a1 >> 8)
+		b = (b1 * 0xFFFF) / (a1 >> 8)
+		a = a1 >> 8
+		return
+	}, runtime.NumCPU())
 }
 
 // convertNRGBA64ToRGBA converts a 16-bit non-premultiplied RGBA image to 8-bit premultiplied
 func (dsl *dslCollection) convertNRGBA64ToRGBA(src *image.NRGBA64) *image.RGBA {
-	bounds := src.Bounds()
-	dst := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.NRGBA64At(x, y)
-			// Convert to 8-bit and premultiply
-			a8 := uint8(c.A >> 8)
-			dst.Set(x, y, color.RGBA{
-				R: uint8((uint32(c.R) * uint32(a8)) / 0xff >> 8),
-				G: uint8((uint32(c.G) * uint32(a8)) / 0xff >> 8),
-				B: uint8((uint32(c.B) * uint32(a8)) / 0xff >> 8),
-				A: a8,
-			})
+	return dsl.parallelProcessRGBA(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		a8 := a1 >> 8
+		r = (r1 * a8) / 0xFF >> 8
+		g = (g1 * a8) / 0xFF >> 8
+		b = (b1 * a8) / 0xFF >> 8
+		a = a8
+		return
+	}, runtime.NumCPU())
 }
 
 // convertNRGBAToRGBA64 converts an 8-bit non-premultiplied RGBA image to 16-bit premultiplied
 func (dsl *dslCollection) convertNRGBAToRGBA64(src *image.NRGBA) *image.RGBA64 {
-	bounds := src.Bounds()
-	dst := image.NewRGBA64(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := src.NRGBAAt(x, y)
-			// First convert to 16-bit, then premultiply
-			r16 := uint16(c.R) * 257
-			g16 := uint16(c.G) * 257
-			b16 := uint16(c.B) * 257
-			a16 := uint16(c.A) * 257
-
-			dst.Set(x, y, color.RGBA64{
-				R: uint16((uint32(r16) * uint32(a16)) / 0xffff),
-				G: uint16((uint32(g16) * uint32(a16)) / 0xffff),
-				B: uint16((uint32(b16) * uint32(a16)) / 0xffff),
-				A: a16,
-			})
+	return dsl.parallelProcessRGBA64(src, func(r1, g1, b1, a1 uint32) (r uint32, g uint32, b uint32, a uint32) {
+		if a1 == 0 {
+			return
 		}
-	}
-	return dst
+		a16 := a1 * 257
+		r = ((r1 * 257) * a16) / 0xFFFF
+		g = ((g1 * 257) * a16) / 0xFFFF
+		b = ((b1 * 257) * a16) / 0xFFFF
+		a = a16
+		return
+	}, runtime.NumCPU())
 }
 
 // castColor handles conversions between different color types

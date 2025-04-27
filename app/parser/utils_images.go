@@ -62,18 +62,15 @@ func dslParallelProcessImage[T image.Image](img image.Image, processor dslPixelP
 }
 
 func (dsl *dslCollection) getColor(img image.Image, x, y int) (r, g, b, a uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
 	switch t := img.(type) {
 	case *image.NRGBA:
-		if !(image.Point{x, y}.In(t.Rect)) {
-			return
-		}
 		i := t.PixOffset(x, y)
 		s := t.Pix[i : i+4 : i+4] // Small cap improves performance, see https://golang.org/issue/27857
 		return uint32(s[0]), uint32(s[1]), uint32(s[2]), uint32(s[3])
 	case *image.NRGBA64:
-		if !(image.Point{x, y}.In(t.Rect)) {
-			return
-		}
 		i := t.PixOffset(x, y)
 		s := t.Pix[i : i+8 : i+8] // Small cap improves performance, see https://golang.org/issue/27857
 		return uint32(s[0])<<8 | uint32(s[1]),
@@ -81,22 +78,96 @@ func (dsl *dslCollection) getColor(img image.Image, x, y int) (r, g, b, a uint32
 			uint32(s[4])<<8 | uint32(s[5]),
 			uint32(s[6])<<8 | uint32(s[7])
 	case *image.RGBA:
-		if !(image.Point{x, y}.In(t.Rect)) {
-			return
-		}
 		i := t.PixOffset(x, y)
 		s := t.Pix[i : i+4 : i+4] // Small cap improves performance, see https://golang.org/issue/27857
 		return uint32(s[0]), uint32(s[1]), uint32(s[2]), uint32(s[3])
 	case *image.RGBA64:
-		if !(image.Point{x, y}.In(t.Rect)) {
-			return
-		}
 		i := t.PixOffset(x, y)
 		s := t.Pix[i : i+8 : i+8] // Small cap improves performance, see https://golang.org/issue/27857
 		return uint32(s[0])<<8 | uint32(s[1]),
 			uint32(s[2])<<8 | uint32(s[3]),
 			uint32(s[4])<<8 | uint32(s[5]),
 			uint32(s[6])<<8 | uint32(s[7])
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) getColorRedChannel(img image.Image, x, y int) (r uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)])
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i])<<8 | uint32(t.Pix[i+1])
+	case *image.RGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)])
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i])<<8 | uint32(t.Pix[i+1])
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) getColorGreenChannel(img image.Image, x, y int) (g uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)+1])
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i+2])<<8 | uint32(t.Pix[i+3])
+	case *image.RGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)+1])
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i+2])<<8 | uint32(t.Pix[i+3])
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) getColorBlueChannel(img image.Image, x, y int) (b uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)+2])
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i+4])<<8 | uint32(t.Pix[i+5])
+	case *image.RGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)+2])
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i+4])<<8 | uint32(t.Pix[i+5])
+	default:
+		panic(fmt.Sprintf("image type is unsupported: %T", t))
+	}
+}
+
+func (dsl *dslCollection) getColorAlphaChannel(img image.Image, x, y int) (a uint32) {
+	if !(image.Point{x, y}.In(img.Bounds())) {
+		return
+	}
+	switch t := img.(type) {
+	case *image.NRGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)+3])
+	case *image.NRGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i+6])<<8 | uint32(t.Pix[i+7])
+	case *image.RGBA:
+		return uint32(t.Pix[t.PixOffset(x, y)+3])
+	case *image.RGBA64:
+		i := t.PixOffset(x, y)
+		return uint32(t.Pix[i+6])<<8 | uint32(t.Pix[i+7])
 	default:
 		panic(fmt.Sprintf("image type is unsupported: %T", t))
 	}

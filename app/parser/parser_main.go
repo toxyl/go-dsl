@@ -146,9 +146,10 @@ func (p *dslParser) parseNode() (*dslNode, error) {
 	case dsl.tokens.callEnd:
 		parens := 0
 		for _, t := range p.tokens {
-			if t.Type == dsl.tokens.callStart {
+			switch t.Type {
+			case dsl.tokens.callStart:
 				parens++
-			} else if t.Type == dsl.tokens.callEnd {
+			case dsl.tokens.callEnd:
 				parens--
 			}
 		}

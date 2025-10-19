@@ -37,3 +37,9 @@ func (dsl *dslCollection) shellResultColor(col color.Color) string {
 	}
 	return fmt.Sprintf("color(r: %d, g: %d, b: %d, a: %d)", r, g, b, a)
 }
+
+func (dsl *dslCollection) shellResultPoint(p Point) string {
+	return p.String()
+}
+
+// TODO: NEW TYPES: add additional shellResult* functions

@@ -512,6 +512,9 @@ func (dsl *dslCollection) shell() {
 			resStr = dsl.shellResultColor(result.value.(color.Color))
 		case *image.RGBA, *image.NRGBA, *image.RGBA64, *image.NRGBA64:
 			resStr = dsl.shellResultImage(result.value.(image.Image))
+		case Point:
+			resStr = dsl.shellResultPoint(result.value.(Point))
+		// TODO: NEW TYPES: add additional types
 		default:
 			resStr = fmt.Sprint(result.value)
 		}

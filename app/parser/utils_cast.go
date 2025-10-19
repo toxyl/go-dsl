@@ -25,6 +25,9 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 		return dsl.castImage(value, targetType)
 	case color.RGBA, color.RGBA64:
 		return dsl.castColor(value, targetType)
+	case Point:
+		return dsl.castPoint(value, targetType)
+	// TODO: NEW TYPES: add additional types
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
 	default:
 		// If we get here the type is not supported
@@ -691,3 +694,18 @@ func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
 	}
 	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 }
+
+func (dsl *dslCollection) castPoint(value any, targetType string) (any, error) {
+	switch v := value.(type) {
+	case Point:
+		switch targetType {
+		case "language.Point":
+			return v, nil
+		case "Point":
+			return v, nil
+		}
+	}
+	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+}
+
+// TODO: NEW TYPES: add additional cast* functions

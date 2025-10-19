@@ -514,6 +514,8 @@ func (dsl *dslCollection) shell() {
 			resStr = dsl.shellResultImage(result.value.(image.Image))
 		case Point:
 			resStr = dsl.shellResultPoint(result.value.(Point))
+		case Rect:
+			resStr = dsl.shellResultRect(result.value.(Rect))
 		// TODO: NEW TYPES: add additional types
 		default:
 			resStr = fmt.Sprint(result.value)

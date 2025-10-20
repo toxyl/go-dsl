@@ -152,6 +152,9 @@ func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResul
 		if dsl.parser.curr.Type == dsl.tokens.terminator {
 			continue
 		}
+		if dsl.parser.curr.Type == dsl.tokens.comment {
+			continue
+		}
 
 		node, err := dsl.parser.parseNode()
 		if err != nil {

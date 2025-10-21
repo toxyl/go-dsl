@@ -38,7 +38,16 @@ func (dsl *dslCollection) shellResultColor(col color.Color) string {
 	return fmt.Sprintf("color(r: %d, g: %d, b: %d, a: %d)", r, g, b, a)
 }
 
-func (dsl *dslCollection) shellResultPoint(p Point) string { return p.String() }
-func (dsl *dslCollection) shellResultRect(r Rect) string   { return r.String() }
+func (dsl *dslCollection) shellResultPoint(p Point) string         { return p.String() }
+func (dsl *dslCollection) shellResultRect(r Rect) string           { return r.String() }
+func (dsl *dslCollection) shellResultNGon(p NGon) string           { return p.String() }
+func (dsl *dslCollection) shellResultTriangle(t Triangle) string   { return t.String() }
+func (dsl *dslCollection) shellResultQuad(q Quad) string           { return q.String() }
+func (dsl *dslCollection) shellResultEllipse(e Ellipse) string     { return e.String() }
+func (dsl *dslCollection) shellResultLineStyle(l LineStyle) string { return l.String() }
+func (dsl *dslCollection) shellResultFillStyle(f FillStyle) string { return f.String() }
+func (dsl *dslCollection) shellResultTextStyle(t TextStyle) string { return t.String() }
+func (dsl *dslCollection) shellResultVector(v Vector) string       { return v.String() }
+func (dsl *dslCollection) shellResultText(t Text) string           { return t.String() }
 
 // TODO: NEW TYPES: add additional shellResult* functions

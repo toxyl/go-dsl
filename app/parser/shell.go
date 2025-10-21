@@ -516,6 +516,24 @@ func (dsl *dslCollection) shell() {
 			resStr = dsl.shellResultPoint(result.value.(Point))
 		case Rect:
 			resStr = dsl.shellResultRect(result.value.(Rect))
+		case NGon:
+			resStr = dsl.shellResultNGon(result.value.(NGon))
+		case Triangle:
+			resStr = dsl.shellResultTriangle(result.value.(Triangle))
+		case Quad:
+			resStr = dsl.shellResultQuad(result.value.(Quad))
+		case Ellipse:
+			resStr = dsl.shellResultEllipse(result.value.(Ellipse))
+		case Vector:
+			resStr = dsl.shellResultVector(result.value.(Vector))
+		case Text:
+			resStr = dsl.shellResultText(result.value.(Text))
+		case LineStyle:
+			resStr = dsl.shellResultLineStyle(result.value.(LineStyle))
+		case FillStyle:
+			resStr = dsl.shellResultFillStyle(result.value.(FillStyle))
+		case TextStyle:
+			resStr = dsl.shellResultTextStyle(result.value.(TextStyle))
 		// TODO: NEW TYPES: add additional types
 		default:
 			resStr = fmt.Sprint(result.value)

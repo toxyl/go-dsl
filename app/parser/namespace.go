@@ -13,40 +13,6 @@ type dslTokenType string
 // parsed and evaluated.
 type dslNodeKind int
 
-type Point struct {
-	X float64
-	Y float64
-}
-
-func (p *Point) String() string {
-	return fmt.Sprintf("P(%f %f)", p.X, p.Y)
-}
-
-type Rect struct {
-	P1 Point
-	P2 Point
-}
-
-func (r *Rect) Translate(delta Point) *Rect {
-	r.P1.X += delta.X
-	r.P2.X += delta.X
-	r.P1.Y += delta.Y
-	r.P2.Y += delta.Y
-	return r
-}
-
-func (r *Rect) X1() float64 { return min(r.P1.X, r.P2.X) }
-func (r *Rect) X2() float64 { return max(r.P1.X, r.P2.X) }
-func (r *Rect) Y1() float64 { return min(r.P1.Y, r.P2.Y) }
-func (r *Rect) Y2() float64 { return max(r.P1.Y, r.P2.Y) }
-func (r *Rect) W() float64  { return r.X2() - r.X1() }
-func (r *Rect) H() float64  { return r.Y2() - r.Y1() }
-func (r *Rect) String() string {
-	return fmt.Sprintf("R(%f %f %f %f)", r.X1(), r.Y1(), r.X2(), r.Y2())
-}
-
-// TODO: NEW TYPES: add additional types
-
 func dslError(fmtStr string, args ...any) error {
 	return fmt.Errorf(fmtStr, args...)
 }

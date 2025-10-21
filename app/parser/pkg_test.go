@@ -1614,10 +1614,10 @@ func getRGBA64Components(c color.RGBA64) (r, g, b, a uint32) {
 // Helper function to set RGBA64 color with clamped values
 func setRGBA64Color(img *image.RGBA64, x, y int, r, g, b, a uint32) {
 	img.Set(x, y, color.RGBA64{
-		R: uint16(min(r, 0xffff)),
-		G: uint16(min(g, 0xffff)),
-		B: uint16(min(b, 0xffff)),
-		A: uint16(min(a, 0xffff)),
+		R: uint16(math.Min(r, 0xffff)),
+		G: uint16(math.Min(g, 0xffff)),
+		B: uint16(math.Min(b, 0xffff)),
+		A: uint16(math.Min(a, 0xffff)),
 	})
 }
 

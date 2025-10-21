@@ -12,6 +12,17 @@ import (
 	"github.com/toxyl/math"
 )
 
+// castSelfOnly handles casting for types that can only be cast to themselves
+func castSelfOnly[T any](dsl *dslCollection, value T, targetType, typeName string) (any, error) {
+	if targetType == typeName || targetType == "language."+typeName {
+		return value, nil
+	}
+	if targetType == "*"+typeName || targetType == "*language."+typeName {
+		return value, nil
+	}
+	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+}
+
 // cast attempts to convert a value to the target type
 func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 	if value == nil {
@@ -19,16 +30,34 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 	}
 
 	// Validate input type
-	switch value.(type) {
+	switch value := value.(type) {
 	// These types are supported
 	case *image.NRGBA, *image.RGBA, *image.RGBA64, *image.NRGBA64:
 		return dsl.castImage(value, targetType)
 	case color.RGBA, color.RGBA64:
 		return dsl.castColor(value, targetType)
 	case Point:
-		return dsl.castPoint(value, targetType)
+		return castSelfOnly(dsl, value, targetType, "Point")
 	case Rect:
-		return dsl.castRect(value, targetType)
+		return castSelfOnly(dsl, value, targetType, "Rect")
+	case NGon:
+		return castSelfOnly(dsl, value, targetType, "NGon")
+	case Triangle:
+		return castSelfOnly(dsl, value, targetType, "Triangle")
+	case Quad:
+		return castSelfOnly(dsl, value, targetType, "Quad")
+	case Ellipse:
+		return castSelfOnly(dsl, value, targetType, "Ellipse")
+	case Vector:
+		return castSelfOnly(dsl, value, targetType, "Vector")
+	case Text:
+		return castSelfOnly(dsl, value, targetType, "Text")
+	case LineStyle:
+		return castSelfOnly(dsl, value, targetType, "LineStyle")
+	case FillStyle:
+		return castSelfOnly(dsl, value, targetType, "FillStyle")
+	case TextStyle:
+		return castSelfOnly(dsl, value, targetType, "TextStyle")
 	// TODO: NEW TYPES: add additional types
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
 	default:
@@ -697,30 +726,4 @@ func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
 	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 }
 
-func (dsl *dslCollection) castPoint(value any, targetType string) (any, error) {
-	switch v := value.(type) {
-	case Point:
-		switch targetType {
-		case "language.Point":
-			return v, nil
-		case "Point":
-			return v, nil
-		}
-	}
-	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
-}
-
-func (dsl *dslCollection) castRect(value any, targetType string) (any, error) {
-	switch v := value.(type) {
-	case Rect:
-		switch targetType {
-		case "language.Rect":
-			return v, nil
-		case "Rect":
-			return v, nil
-		}
-	}
-	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
-}
-
-// TODO: NEW TYPES: add additional cast* functions
+// TODO: NEW TYPES: add additional cast* functions if needed

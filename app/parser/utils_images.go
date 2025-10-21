@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"image"
 	"sync"
+
+	"github.com/toxyl/math"
 )
 
 type dslPixelProcessor func(r1, g1, b1, a1 uint32) (r, g, b, a uint32)
@@ -39,7 +41,7 @@ func dslParallelProcessImage[T image.Image](img image.Image, processor dslPixelP
 	for i := range numWorkers {
 		rowsPerWorker := (height + numWorkers - 1) / numWorkers
 		startY := minY + i*rowsPerWorker
-		endY := min(startY+rowsPerWorker, maxY)
+		endY := math.Min(startY+rowsPerWorker, maxY)
 		if startY >= endY {
 			continue
 		}

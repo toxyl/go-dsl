@@ -19,7 +19,6 @@ func (r *dslVarRegistry) storeState() {
 func (r *dslVarRegistry) restoreState() {
 	toRemove := r.state.get()
 	for _, name := range toRemove {
-		fmt.Printf("\x1b[31mRemoving variable %s\x1b[0m\n", name)
 		delete(r.data, name)
 	}
 	r.state.reset()

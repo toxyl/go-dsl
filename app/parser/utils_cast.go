@@ -29,6 +29,25 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 		return nil, dsl.errors.NIL_CAST()
 	}
 
+	// Handle slice types before the main switch
+	if strings.HasPrefix(targetType, "[]") {
+		valType := reflect.TypeOf(value)
+		if valType != nil && valType.Kind() == reflect.Slice {
+			// Target is a slice, source is also a slice
+			if targetType == "[]any" {
+				// Convert any slice to []any
+				val := reflect.ValueOf(value)
+				result := make([]any, val.Len())
+				for i := 0; i < val.Len(); i++ {
+					result[i] = val.Index(i).Interface()
+				}
+				return result, nil
+			}
+			// Slice-to-slice conversions (except []any) are not allowed
+			return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+		}
+	}
+
 	// Validate input type
 	switch value := value.(type) {
 	// These types are supported
@@ -724,6 +743,50 @@ func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
 		}
 	}
 	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+}
+
+// toFloat64 converts any numeric value to float64.
+// Supports int, int64, float32, float64, and string numeric types.
+// Returns an error if the value cannot be converted to float64.
+func (dsl *dslCollection) toFloat64(value any) (float64, error) {
+	if value == nil {
+		return 0, nil
+	}
+
+	switch v := value.(type) {
+	case float64:
+		return v, nil
+	case float32:
+		return float64(v), nil
+	case int:
+		return float64(v), nil
+	case int8:
+		return float64(v), nil
+	case int16:
+		return float64(v), nil
+	case int32:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case uint:
+		return float64(v), nil
+	case uint8:
+		return float64(v), nil
+	case uint16:
+		return float64(v), nil
+	case uint32:
+		return float64(v), nil
+	case uint64:
+		return float64(v), nil
+	case string:
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, dsl.errors.CAST_NOT_POSSIBLE("string", "float64")
+		}
+		return f, nil
+	default:
+		return 0, dsl.errors.UNSUPPORTED_SOURCE_TYPE(value)
+	}
 }
 
 // TODO: NEW TYPES: add additional cast* functions if needed

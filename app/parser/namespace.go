@@ -72,6 +72,9 @@ type dslCollection struct {
 		PSR_PARAM_STYLE_MISMATCH            func() error
 		PSR_PARAM_TOO_MANY                  func(name string) error
 		PSR_UNSUPPORTED_NODE_TYPE           func(node *dslNode) error
+		PSR_FOR_NOT_TOP_LEVEL               func() error
+		PSR_FOR_INVALID_VARS                func() error
+		PSR_FOR_TARGET_NOT_ITERABLE         func() error
 	}
 	tokens struct {
 		invalid    dslTokenType // Invalid token
@@ -94,6 +97,14 @@ type dslCollection struct {
 		fnName     dslTokenType // Function name
 		parenOpen  dslTokenType // Open parenthesis
 		parenClose dslTokenType // Close parenthesis
+		sliceStart dslTokenType // Start of slice literal
+		sliceEnd   dslTokenType // End of slice literal
+		indexStart dslTokenType // Start of index access
+		indexEnd   dslTokenType // End of index access
+		rowStart   dslTokenType // Start of matrix row '<'
+		rowEnd     dslTokenType // End of matrix row '>'
+		forLoop    dslTokenType // For loop keyword
+		done       dslTokenType // Done keyword (end of for loop)
 	}
 	nodes struct {
 		call       dslNodeKind // Function call node (e.g. print("hello"))
@@ -106,6 +117,11 @@ type dslCollection struct {
 		assign     dslNodeKind // Variable assignment node (e.g. x: 42)
 		terminator dslNodeKind // End of statement marker
 		argRef     dslNodeKind // Script argument reference node (e.g. $1, $2)
+		slice      dslNodeKind // Slice literal node (e.g. { 1 2 3 })
+		index      dslNodeKind // Slice index access node (e.g. a[2])
+		matrix     dslNodeKind // Matrix literal node (e.g. { <...> <...> })
+		row        dslNodeKind // Matrix row node
+		forRange   dslNodeKind // For range loop node (e.g. for matrix[i item]{...})
 	}
 }
 
@@ -153,6 +169,9 @@ var dsl = dslCollection{
 		PSR_PARAM_STYLE_MISMATCH            func() error
 		PSR_PARAM_TOO_MANY                  func(name string) error
 		PSR_UNSUPPORTED_NODE_TYPE           func(node *dslNode) error
+		PSR_FOR_NOT_TOP_LEVEL               func() error
+		PSR_FOR_INVALID_VARS                func() error
+		PSR_FOR_TARGET_NOT_ITERABLE         func() error
 	}{
 		UNSUPPORTED_TARGET_TYPE:  func(typ string) error { return dslError("unsupported target type: %s", typ) },
 		STRING_CAST:              func(str, typ string) error { return dslError("cannot cast string %q to %s", str, typ) },
@@ -198,6 +217,9 @@ var dsl = dslCollection{
 		PSR_PARAM_STYLE_MISMATCH:     func() error { return dslError("must use positional or named arguments, not both") },
 		PSR_PARAM_TOO_MANY:           func(name string) error { return dslError("too many arguments for function %s", name) },
 		PSR_UNSUPPORTED_NODE_TYPE:    func(node *dslNode) error { return dslError("unsupported node type: %v", node.kind) },
+		PSR_FOR_NOT_TOP_LEVEL:        func() error { return dslError("for loops are only allowed at top level") },
+		PSR_FOR_INVALID_VARS:         func() error { return dslError("invalid for loop variable declaration") },
+		PSR_FOR_TARGET_NOT_ITERABLE:  func() error { return dslError("for loop target must be a slice or matrix") },
 	},
 	tokens: struct {
 		invalid    dslTokenType
@@ -220,6 +242,14 @@ var dsl = dslCollection{
 		fnName     dslTokenType
 		parenOpen  dslTokenType
 		parenClose dslTokenType
+		sliceStart dslTokenType
+		sliceEnd   dslTokenType
+		indexStart dslTokenType
+		indexEnd   dslTokenType
+		rowStart   dslTokenType
+		rowEnd     dslTokenType
+		forLoop    dslTokenType
+		done       dslTokenType
 	}{
 		invalid:    "INVALID",
 		argRef:     "ARG_REF",
@@ -241,6 +271,14 @@ var dsl = dslCollection{
 		fnName:     "FUNC_NAME",
 		parenOpen:  "OPEN_PAREN",
 		parenClose: "CLOSE_PAREN",
+		sliceStart: "SLICE_START",
+		sliceEnd:   "SLICE_END",
+		indexStart: "INDEX_START",
+		indexEnd:   "INDEX_END",
+		rowStart:   "ROW_START",
+		rowEnd:     "ROW_END",
+		forLoop:    "FOR_LOOP",
+		done:       "DONE",
 	},
 	nodes: struct {
 		call       dslNodeKind
@@ -253,6 +291,11 @@ var dsl = dslCollection{
 		assign     dslNodeKind
 		terminator dslNodeKind
 		argRef     dslNodeKind
+		slice      dslNodeKind
+		index      dslNodeKind
+		matrix     dslNodeKind
+		row        dslNodeKind
+		forRange   dslNodeKind
 	}{
 		call:       0,
 		arg:        1,
@@ -264,5 +307,10 @@ var dsl = dslCollection{
 		assign:     7,
 		terminator: 8,
 		argRef:     9,
+		slice:      10,
+		index:      11,
+		matrix:     12,
+		row:        13,
+		forRange:   14,
 	},
 }

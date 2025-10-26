@@ -36,18 +36,49 @@ func (t *dslTokenizer) lex() error {
 
 	// properly lex the result:
 	parens := 0
+	slices := 0
+	inSlice := 0
+	indexes := 0
 	for i, token := range t.tokens {
 		switch token.Type {
+		case dsl.tokens.forLoop:
+			continue
+		case dsl.tokens.done:
+			continue
+		case dsl.tokens.sliceEnd:
+			slices--
+			inSlice--
+			if slices < 0 {
+				return dsl.errors.TKN_PAREN_MISMATCH()
+			}
+			continue
+		case dsl.tokens.sliceStart:
+			slices++
+			inSlice++
+			continue
+		case dsl.tokens.indexStart:
+			indexes++
+			continue
+		case dsl.tokens.indexEnd:
+			indexes--
+			if indexes < 0 {
+				return dsl.errors.TKN_PAREN_MISMATCH()
+			}
+			continue
 		case dsl.tokens.callStart:
 			dsl.trimTokenSpace(token)
 			if dsl.containsTokenSpace(token) {
 				return dsl.errors.TKN_FUNC_WITH_SPACE()
 			}
-			parens++
+			if inSlice == 0 && indexes == 0 {
+				parens++
+			}
 		case dsl.tokens.callEnd:
-			parens--
-			if parens < 0 {
-				return dsl.errors.TKN_PAREN_MISMATCH()
+			if inSlice == 0 && indexes == 0 {
+				parens--
+				if parens < 0 {
+					return dsl.errors.TKN_PAREN_MISMATCH()
+				}
 			}
 		case dsl.tokens.assign:
 			if dsl.isAssignToken(token) && dsl.isAssign(token.Value[0]) {
@@ -61,7 +92,15 @@ func (t *dslTokenizer) lex() error {
 	if parens != 0 {
 		return dsl.errors.TKN_PAREN_MISMATCH()
 	}
+	if indexes != 0 {
+		return dsl.errors.TKN_PAREN_MISMATCH()
+	}
 	return nil
+}
+
+func (t *dslTokenizer) isForLoopBody(tokenIndex int) bool {
+	// This function is no longer used with the new syntax
+	return false
 }
 
 // getTokens returns all tokens found during tokenization.
@@ -157,8 +196,14 @@ func (t *dslTokenizer) addTokenAndSetNext(token *dslToken, typ dslTokenType) {
 	if t.hasTokens() && dsl.isCallStartToken(token) && t.state.notInInParens() && dsl.isNotTerminatorToken(dsl.getLastToken(t.tokens)) && dsl.isNotAssignToken(dsl.getLastToken(t.tokens)) {
 		t.addToken(*dsl.newTerminatorToken())
 	}
+	// Add terminator before for loops if needed
+	if t.hasTokens() && token.Value == "for" && dsl.isNotTerminatorToken(dsl.getLastToken(t.tokens)) && dsl.isNotAssignToken(dsl.getLastToken(t.tokens)) {
+		t.addToken(*dsl.newTerminatorToken())
+	}
 	t.determineTokenType(token)
-	dsl.trimTokenRight(token, " ")
+	if dsl.isNotStringToken(token) && dsl.isNotCommentToken(token) {
+		dsl.trimTokenRight(token, " ")
+	}
 
 	t.addToken(*token)
 	(*token) = *dsl.newToken("", typ)
@@ -175,6 +220,12 @@ func (t *dslTokenizer) addCallEndToken(token *dslToken) (cont bool, err error) {
 		return false, dsl.errors.TKN_PAREN_MISMATCH()
 	}
 	if t.state.notInInParens() {
+		// If we're inside a slice or index, do NOT end the statement here.
+		// We just finished a function used as a slice/index element; expect more elements.
+		if t.state.inSlice() || t.state.inIndex() {
+			t.state.argValueStart()
+			return false, nil
+		}
 		t.state.callEnd()
 		t.state.statementEnd()
 		t.addTokenAndSetNext(token, dsl.tokens.terminator)
@@ -186,8 +237,19 @@ func (t *dslTokenizer) addCallEndToken(token *dslToken) (cont bool, err error) {
 
 // determineTokenType sets the type of a token based on its value and context.
 func (t *dslTokenizer) determineTokenType(token *dslToken) {
+	v := token.Value
+
+	// Keywords must be checked unconditionally
+	if dsl.equals(v, "for") {
+		token.Type = dsl.tokens.forLoop
+		return
+	}
+	if dsl.equals(v, "done") {
+		token.Type = dsl.tokens.done
+		return
+	}
+
 	if dsl.isArgValueToken(token) || dsl.isInvalidToken(token) {
-		v := token.Value
 		switch {
 		case dsl.equals(v, "true"), dsl.equals(v, "false"):
 			token.Type = dsl.tokens.boolean
@@ -220,7 +282,31 @@ func (t *dslTokenizer) handleString() error {
 	for t.hasCharacterLeft() {
 		c := t.source[t.pos]
 
-		// Handle escape sequences
+		// If currently in an escape sequence, interpret next character
+		if t.state.inEscape() {
+			switch c {
+			case 'n':
+				t.token.append('\n')
+			case 'r':
+				t.token.append('\r')
+			case 't':
+				t.token.append('\t')
+			case '\\':
+				t.token.append('\\')
+			case '"':
+				t.token.append('"')
+			case '#':
+				t.token.append('#')
+			default:
+				// Unknown escape: treat as literal character
+				t.token.append(c)
+			}
+			t.state.escapeEnd()
+			t.pos++
+			continue
+		}
+
+		// Start escape
 		if dsl.isEscape(c) {
 			t.state.escapeStart()
 			t.pos++
@@ -238,7 +324,6 @@ func (t *dslTokenizer) handleString() error {
 
 		// Add character to token value
 		t.token.append(c)
-		t.state.escapeEnd()
 		t.pos++
 	}
 
@@ -479,6 +564,41 @@ func (t *dslTokenizer) tokenize() error {
 			t.state.assignEnd()
 		}
 
+		// handle slice content (elements and rows)
+		if t.state.inSlice() {
+			// check if it's a slice end
+			if dsl.isSliceEnd(c) {
+				// we finished the last element, add it if it exists
+				dsl.trimTokenSpace(t.token)
+				if dsl.isNotEmptyToken(token) {
+					t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				}
+				t.state.sliceClose()
+				// Disabled for for loops
+				// if t.state.slices < 0 {
+				// 	return dsl.errors.TKN_PAREN_MISMATCH()
+				// }
+				t.addTokenAndSetNext(dsl.newToken("}", dsl.tokens.sliceEnd), dsl.tokens.invalid)
+				t.state.argValueEnd()
+				if t.state.notInSlice() && t.state.notInCall() {
+					t.state.statementEnd()
+					t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.terminator)
+				}
+				t.pos++
+				continue
+			}
+
+			// check if it's an element separator
+			if dsl.isWhitespace(c) {
+				dsl.trimTokenSpace(t.token)
+				if dsl.isNotEmptyToken(token) {
+					t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				}
+				t.pos++
+				continue
+			}
+		}
+
 		// check if we're in a function call and we're waiting for arguments
 		if t.state.waitingForArgs() {
 			// check if it's a function call without args
@@ -574,6 +694,100 @@ func (t *dslTokenizer) tokenize() error {
 			continue
 		}
 
+		// determine if it's a slice start character
+		// for slices, i.e. "{ 1 2 3 }"
+		if dsl.isSliceStart(c) && t.state.notInString() && t.state.inCode() && t.state.notInSlice() {
+			t.token.append(c)
+			token.Type = dsl.tokens.sliceStart
+			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			t.state.sliceOpen()
+			t.state.argValueStart()
+			t.pos++
+			continue
+		}
+
+		// matrix row start '<' only valid inside slice
+		if dsl.isRowStart(c) && t.state.notInString() && t.state.inCode() && t.state.inSlice() {
+			// finalize any pending value as element of current row
+			dsl.trimTokenSpace(t.token)
+			if dsl.isNotEmptyToken(token) {
+				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+			}
+			t.addTokenAndSetNext(dsl.newToken("<", dsl.tokens.rowStart), dsl.tokens.invalid)
+			t.state.argValueStart()
+			t.pos++
+			continue
+		}
+
+		// matrix row end '>' only valid inside slice
+		if dsl.isRowEnd(c) && t.state.notInString() && t.state.inCode() && t.state.inSlice() {
+			dsl.trimTokenSpace(t.token)
+			if dsl.isNotEmptyToken(token) {
+				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+			}
+			t.addTokenAndSetNext(dsl.newToken(">", dsl.tokens.rowEnd), dsl.tokens.invalid)
+			t.state.argValueEnd()
+			t.pos++
+			continue
+		}
+
+		// determine if it's an index start character
+		// for indexes, i.e. "a[ 1 ]"
+		if dsl.isIndexStart(c) && t.state.notInString() && t.state.inCode() {
+			// finalize current token (base expression) if present
+			dsl.trimTokenSpace(t.token)
+			if dsl.isNotEmptyToken(token) {
+				t.determineTokenType(token)
+				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+			}
+			// emit indexStart token using current token
+			t.token.append(c)
+			token.Type = dsl.tokens.indexStart
+			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			t.state.indexOpen()
+			t.state.argValueStart()
+			t.pos++
+			continue
+		}
+
+		// determine if it's an index end character
+		if dsl.isIndexEnd(c) && t.state.notInString() && t.state.inCode() && t.state.inIndex() {
+			// we finished the last index token, add it if it exists
+			dsl.trimTokenSpace(t.token)
+			if dsl.isNotEmptyToken(token) {
+				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+			}
+			// emit indexEnd token
+			t.addToken(*dsl.newToken("]", dsl.tokens.indexEnd))
+			t.state.argValueEnd()
+			t.state.indexClose()
+			// If we're not inside another index/call/slice and not in parens, end the statement
+			if t.state.notInIndex() && t.state.notInCall() && t.state.notInSlice() && t.state.notInInParens() {
+				t.state.statementEnd()
+				t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.terminator)
+			}
+			t.pos++
+			continue
+		}
+
+		// determine if it's a slice end character (outside the slice handling block)
+		// for slices, i.e. "{ 1 2 3 }"
+		if dsl.isSliceEnd(c) && t.state.notInString() && t.state.inCode() && t.state.notInSlice() {
+			dsl.trimTokenSpace(t.token)
+			if dsl.isNotEmptyToken(token) {
+				t.determineTokenType(token)
+				t.addToken(*token)
+			}
+			t.state.sliceClose()
+			if t.state.slices < 0 {
+				return dsl.errors.TKN_PAREN_MISMATCH()
+			}
+			t.addToken(*dsl.newToken("}", dsl.tokens.sliceEnd))
+			t.state.argValueEnd()
+			t.pos++
+			continue
+		}
+
 		if dsl.isTerminator(c) {
 			t.token.append(c)
 			t.token.Type = dsl.tokens.terminator
@@ -584,6 +798,14 @@ func (t *dslTokenizer) tokenize() error {
 
 		if dsl.isWhitespace(c) {
 			t.determineTokenType(token)
+			// Add terminator before for loops if needed
+			if token.Value == "for" && dsl.isNotTerminatorToken(dsl.getLastToken(t.tokens)) && dsl.isNotAssignToken(dsl.getLastToken(t.tokens)) {
+				t.addToken(*dsl.newTerminatorToken())
+			}
+			// Handle done keyword
+			if token.Value == "done" {
+				token.Type = dsl.tokens.done
+			}
 			t.addTokenAndSetNext(token, dsl.tokens.invalid)
 			t.pos++
 			continue

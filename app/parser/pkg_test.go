@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -18,6 +19,113 @@ import (
 const (
 	testOutputDir = "test_output"
 )
+
+// //////// POINT ///////////////////////////////////////////////////
+func P(x, y float64) *Point {
+	return &Point{
+		X: x,
+		Y: y,
+	}
+}
+
+// @Name: P
+// @Desc: Creates a new point at P(x|y).
+// @Param:      x        - - 0   The start position on the x-axis
+// @Param:      y        - - 0   The start position on the y-axis
+// @Returns:    result   - - -	 A new point
+func makePoint(x, y float64) (Point, error) {
+	return *P(x, y), nil
+}
+
+// isNumeric returns true if the kind is a numeric type
+func isNumeric(k reflect.Kind) bool {
+	switch k {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	}
+	return false
+}
+
+func toFloat64FromReflect(v reflect.Value) float64 {
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		return v.Float()
+	}
+	return 0
+}
+
+// deepEqual is a utility function that extends reflect.DeepEqual with special handling
+// for edge cases like NaN values in floating-point comparisons and numeric type conversions.
+func deepEqual(x, y any) bool {
+	// Handle nil cases
+	if x == nil || y == nil {
+		return x == y
+	}
+
+	// Get the types of both values
+	v1 := reflect.ValueOf(x)
+	v2 := reflect.ValueOf(y)
+
+	// Handle pointers
+	if v1.Kind() == reflect.Ptr && v2.Kind() == reflect.Ptr {
+		if v1.IsNil() || v2.IsNil() {
+			return v1.IsNil() == v2.IsNil()
+		}
+		return deepEqual(v1.Elem().Interface(), v2.Elem().Interface())
+	}
+
+	// Handle structs
+	if v1.Kind() == reflect.Struct && v2.Kind() == reflect.Struct {
+		if v1.Type() != v2.Type() {
+			return false
+		}
+		for i := 0; i < v1.NumField(); i++ {
+			f1val := v1.Field(i)
+			f2val := v2.Field(i)
+			if !f1val.CanInterface() || !f2val.CanInterface() {
+				continue
+			}
+			f1 := f1val.Interface()
+			f2 := f2val.Interface()
+			if !deepEqual(f1, f2) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Special handling for numeric types
+	if isNumeric(v1.Kind()) && isNumeric(v2.Kind()) {
+		// Convert both values to float64 for comparison
+		f1 := toFloat64FromReflect(v1)
+		f2 := toFloat64FromReflect(v2)
+
+		// Handle NaN cases
+		if math.IsNaN(f1) && math.IsNaN(f2) {
+			return true
+		}
+
+		// Handle infinity cases
+		if math.IsInf(f1, 1) && math.IsInf(f2, 1) {
+			return true
+		}
+		if math.IsInf(f1, -1) && math.IsInf(f2, -1) {
+			return true
+		}
+
+		// For non-special cases, compare the float64 values
+		return f1 == f2
+	}
+
+	// For all other types, use reflect.DeepEqual
+	return reflect.DeepEqual(x, y)
+}
 
 func init() {
 	// Create test output directory if it doesn't exist
@@ -509,6 +617,36 @@ func createTestLanguage() {
 			return result, nil
 		},
 	)
+	dsl.funcs.register("P", "Creates a new point at P(x|y).",
+		[]dslParamMeta{
+			{
+				name: "x",
+				typ:  "float64",
+				def:  0,
+				desc: "The start position on the x-axis",
+			},
+			{
+				name: "y",
+				typ:  "float64",
+				def:  0,
+				desc: "The start position on the y-axis",
+			},
+		},
+		[]dslParamMeta{
+			{
+				name: "result",
+				typ:  "any",
+				def:  "-",
+				desc: "A new point",
+			},
+		},
+		func(a ...any) (any, error) {
+			return makePoint(
+				a[0].(float64),
+				a[1].(float64),
+			)
+		},
+	)
 	dsl.storeState()
 }
 
@@ -518,12 +656,59 @@ func testResult(t *testing.T, name string, want any, wantErr bool, got any, err 
 		return
 	}
 	if !wantErr {
-		if !dsl.deepEqual(got, want) {
+		if !deepEqual(got, want) {
 			t.Errorf("\x1b[31m[FAIL] %s: got %v (%T), want %v (%T)\x1b[0m", name, got, got, want, want)
 			return
 		}
 	}
 	t.Logf("\x1b[32m[PASS] %s\x1b[0m", name)
+}
+
+func TestForLoops(t *testing.T) {
+	t.Run("For Loops", func(t *testing.T) {
+		type TestCase struct {
+			name    string
+			script  string
+			args    []any
+			want    *dslResult
+			wantErr bool
+		}
+
+		c := func(name string, script string, args []any, want *dslResult, wantErr bool) TestCase {
+			return TestCase{name, script, args, want, wantErr}
+		}
+
+		tests := []TestCase{
+			c("for loop over slice", `data: { 1 2 3 } sum: 0 for data[i item] sum: add(x=sum y=item) done sum`, []any{}, &dslResult{6, nil}, false),
+			c("for loop over matrix", `matrix: { < 1 2 > < 3 4 > } sum: 0 for matrix[row col item] sum: add(x=sum y=item) done sum`, []any{}, &dslResult{10, nil}, false),
+			c("for loop with assignment", `data: { 10 20 } x: 0 for data[i item] x: add(x item) done x`, []any{}, &dslResult{30, nil}, false),
+			c("for loop with single letter var", `data: { 10 20 } x: 0 for data[i l] x: add(x l) done x`, []any{}, &dslResult{30, nil}, false),
+			c("for loop body with call", `data: { 10 20 } x: 0 for data[i l] x: add(x l) done x`, []any{}, &dslResult{30, nil}, false),
+			c("slice with custom types", `a: 1 b: 2 c: 3 data: { a b c } data`, []any{}, &dslResult{[]float64{1, 2, 3}, nil}, false),
+			c("loop over matrix rows 1", `data: { < 10 20 30 > < 40 50 60 > }
+x: 0
+for data[i item]
+    x: add(x item[1])
+done
+x`, []any{}, &dslResult{70.0, nil}, false),
+			c("[broken] loop over matrix rows 2", `data: { < 10 20 30 "a" P(1 2) > < 40 50 60 "b" P(3 4) > }
+x: 0
+for data[i item]
+    x: add(x item[1])
+done
+aSliceBreaksItBecauseYouDontProperlyTrackState: { 1 2 3 }
+x`, []any{}, &dslResult{70.0, nil}, false),
+		}
+
+		createTestLanguage()
+		for _, tt := range tests {
+			dsl.restoreState()
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := dsl.run(tt.script, false, tt.args...)
+				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
+			})
+		}
+	})
 }
 
 func TestBasicExpressions(t *testing.T) {
@@ -1399,8 +1584,7 @@ func TestParser(t *testing.T) {
 		}
 
 		createTestLanguage()
-		exportPath, _ := filepath.Abs("../../LANGUAGE.vsix")
-		if err := dsl.exportVSCodeExtension(exportPath); err != nil {
+		if err := dsl.exportVSCodeExtension("../../LANGUAGE.vsix"); err != nil {
 			t.Errorf("could not generate VSCode extension: %v", err)
 		}
 
@@ -1590,6 +1774,112 @@ func TestImageProcessing(t *testing.T) {
 			for _, inB := range testImages {
 				processImageWithAllFilters(t, inA, inB)
 			}
+		}
+	})
+}
+
+func TestSlice(t *testing.T) {
+	t.Run("Slice", func(t *testing.T) {
+		type TestCase struct {
+			name    string
+			script  string
+			args    []any
+			want    *dslResult
+			wantErr bool
+		}
+
+		c := func(name string, script string, args []any, want *dslResult, wantErr bool) TestCase {
+			return TestCase{name, script, args, want, wantErr}
+		}
+
+		tests := []TestCase{
+			c("simple slice with literals", `{ 1 2 3 }`, []any{}, &dslResult{[]float64{1, 2, 3}, nil}, false),
+			c("slice with floats", `{ 1.5 2.3 3.14 }`, []any{}, &dslResult{[]float64{1.5, 2.3, 3.14}, nil}, false),
+			c("mixed int and float slice", `{ 1 2.5 3 4.7 }`, []any{}, &dslResult{[]float64{1, 2.5, 3, 4.7}, nil}, false),
+			c("empty slice", `{ }`, []any{}, &dslResult{[]any{}, nil}, false),
+			c("single element slice", `{ 42 }`, []any{}, &dslResult{[]float64{42}, nil}, false),
+			c("slice with variables", `x: 10 y: 20 z: 30 { x y z }`, []any{}, &dslResult{[]float64{10, 20, 30}, nil}, false),
+			c("slice with function calls", `{ add(1 2) mul(3 4) }`, []any{}, &dslResult{[]float64{3, 12}, nil}, false),
+			c("slice assignment to variable", `mySlice: { 1 2 3 4 5 }`, []any{}, &dslResult{[]float64{1, 2, 3, 4, 5}, nil}, false),
+			c("access slice after assignment", `mySlice: { 1 2 3 } mySlice`, []any{}, &dslResult{[]float64{1, 2, 3}, nil}, false),
+			c("large slice", `{ 1 2 3 4 5 6 7 8 9 10 }`, []any{}, &dslResult{[]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, nil}, false),
+			c("string slice", `{ "a" "b" "c" }`, []any{}, &dslResult{[]string{"a", "b", "c"}, nil}, false),
+			c("mixed -> any slice", `{ 1 "x" true }`, []any{}, &dslResult{[]any{float64(1), "x", true}, nil}, false),
+		}
+
+		createTestLanguage()
+		for _, tt := range tests {
+			dsl.restoreState()
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := dsl.run(tt.script, false, tt.args...)
+				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
+			})
+		}
+	})
+}
+
+func TestSliceIndexing(t *testing.T) {
+	t.Run("Slice Indexing", func(t *testing.T) {
+		type TestCase struct {
+			name    string
+			script  string
+			args    []any
+			want    *dslResult
+			wantErr bool
+		}
+
+		c := func(name string, script string, args []any, want *dslResult, wantErr bool) TestCase {
+			return TestCase{name, script, args, want, wantErr}
+		}
+
+		tests := []TestCase{
+			c("literal index", `mySlice: { 1 2 3 4 5 6 } v: mySlice[2] v`, []any{}, &dslResult{float64(3), nil}, false),
+			c("variable index", `n: 4 mySlice: { 1 2 3 4 5 6 } v: mySlice[n] v`, []any{}, &dslResult{float64(5), nil}, false),
+			c("func index", `mySlice: { 1 2 3 4 5 6 } v: mySlice[add(2 3)] v`, []any{}, &dslResult{float64(6), nil}, false),
+			c("oob negative", `mySlice: { 1 2 3 } v: mySlice[-1] v`, []any{}, &dslResult{nil, nil}, true),
+			c("oob too large", `mySlice: { 1 2 3 } v: mySlice[3] v`, []any{}, &dslResult{nil, nil}, true),
+			c("string slice index", `s: { "a" "b" "c" } v: s[1] v`, []any{}, &dslResult{"b", nil}, false),
+			c("any slice index", `x: { 1 "a" true } v1: x[0] v1`, []any{}, &dslResult{float64(1), nil}, false),
+		}
+
+		createTestLanguage()
+		for _, tt := range tests {
+			dsl.restoreState()
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := dsl.run(tt.script, false, tt.args...)
+				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
+			})
+		}
+	})
+}
+
+func TestMatrixLiteralsAndIndexing(t *testing.T) {
+	t.Run("Matrix", func(t *testing.T) {
+		type TestCase struct {
+			name    string
+			script  string
+			want    *dslResult
+			wantErr bool
+		}
+		c := func(name, script string, want *dslResult, wantErr bool) TestCase {
+			return TestCase{name, script, want, wantErr}
+		}
+		tests := []TestCase{
+			c("matrix literal eval", `m: { <1 2 3> <4 5 6> <7 8 9> } m`, &dslResult{[][]float64{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}, nil}, false),
+			c("index 2D literal", `m: { <1 2 3> <4 5 6> <7 8 9> } v: m[1 2] v`, &dslResult{float64(6), nil}, false),
+			c("index 2D with vars", `r: 0 c: 1 m: { <1 2 3> <4 5 6> } v: m[r c] v`, &dslResult{float64(2), nil}, false),
+			c("index 2D with func", `m: { <1 2 3> <4 5 6> <7 8 9> } v: m[add(0 1) add(1 1)] v`, &dslResult{float64(6), nil}, false),
+			c("oob row", `m: { <1 2> <3 4> } v: m[2 0] v`, &dslResult{nil, nil}, true),
+			c("oob col", `m: { <1 2> <3 4> } v: m[0 2] v`, &dslResult{nil, nil}, true),
+			c("generic 2D index strings", `m: { <"a" "b"> <"c" "d"> } v: m[1 0] v`, &dslResult{"c", nil}, false),
+		}
+		createTestLanguage()
+		for _, tt := range tests {
+			dsl.restoreState()
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := dsl.run(tt.script, false)
+				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
+			})
 		}
 	})
 }

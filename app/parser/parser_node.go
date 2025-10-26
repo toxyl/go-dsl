@@ -39,6 +39,10 @@ func (n *dslNode) String() string {
 		typ = "end"
 	case dsl.nodes.argRef:
 		typ = "arg ref"
+	case dsl.nodes.slice:
+		typ = "slice"
+	case dsl.nodes.forRange:
+		typ = "for"
 	}
 	return fmt.Sprintf("Node{Type: %s, Value: %s, Children: %v, Named: %t, ArgName: %s}", typ, n.data, n.children, n.named, n.argName)
 }

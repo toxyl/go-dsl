@@ -70,26 +70,21 @@ func extractFunctionMeta(node *ast.File, functions []metaFunc) []metaFunc {
 			if fn.Type != nil && fn.Type.Params != nil && fn.Type.Params.List != nil {
 				for _, param := range fn.Type.Params.List {
 					for _, name := range param.Names {
-						switch pt := param.Type.(type) {
-						case *ast.StarExpr:
-							switch x := param.Type.(*ast.StarExpr).X.(type) {
-							case *ast.SelectorExpr:
-								types[name.Name] = "*" + x.X.(*ast.Ident).Name + "." + x.Sel.Name
-							case *ast.Ident:
-								types[name.Name] = "*" + x.Name
-							}
-						case *ast.SelectorExpr:
-							types[name.Name] = pt.X.(*ast.Ident).Name + "." + pt.Sel.Name
-						case *ast.Ident:
-							types[name.Name] = pt.Name
-						}
+						types[name.Name] = extractTypeString(param.Type)
 					}
 				}
 			}
 			if fn.Type != nil && fn.Type.Results != nil && fn.Type.Results.List != nil {
 				for _, result := range fn.Type.Results.List {
 					for _, name := range result.Names {
-						types[name.Name] = result.Type.(*ast.Ident).Name
+						if name != nil {
+							types[name.Name] = extractTypeString(result.Type)
+						} else {
+							types["result"] = extractTypeString(result.Type)
+						}
+					}
+					if len(result.Names) == 0 {
+						types["result"] = extractTypeString(result.Type)
 					}
 				}
 			}
@@ -129,6 +124,28 @@ func extractFunctionMeta(node *ast.File, functions []metaFunc) []metaFunc {
 		}
 	}
 	return functions
+}
+
+func extractTypeString(expr ast.Expr) string {
+	switch pt := expr.(type) {
+	case *ast.StarExpr:
+		switch x := pt.X.(type) {
+		case *ast.SelectorExpr:
+			return "*" + x.X.(*ast.Ident).Name + "." + x.Sel.Name
+		case *ast.Ident:
+			return "*" + x.Name
+		case *ast.ArrayType:
+			return "*" + extractTypeString(x)
+		}
+	case *ast.SelectorExpr:
+		return pt.X.(*ast.Ident).Name + "." + pt.Sel.Name
+	case *ast.ArrayType:
+		eltType := extractTypeString(pt.Elt)
+		return "[]" + eltType
+	case *ast.Ident:
+		return pt.Name
+	}
+	return "any"
 }
 
 func extractVariableMeta(node *ast.File, variables []metaVar) []metaVar {

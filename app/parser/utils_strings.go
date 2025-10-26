@@ -98,3 +98,9 @@ func (dsl *dslCollection) isEmpty(s string) bool    { return len(s) == 0 }
 func (dsl *dslCollection) isNewline(s string) bool  { return s == "\n" || s == "\r\n" }
 func (dsl *dslCollection) isComment(c byte) bool    { return c == '#' }
 func (dsl *dslCollection) isArgRef(c byte) bool     { return c == '$' }
+func (dsl *dslCollection) isSliceStart(c byte) bool { return c == '{' }
+func (dsl *dslCollection) isSliceEnd(c byte) bool   { return c == '}' }
+func (dsl *dslCollection) isIndexStart(c byte) bool { return c == '[' }
+func (dsl *dslCollection) isIndexEnd(c byte) bool   { return c == ']' }
+func (dsl *dslCollection) isRowStart(c byte) bool   { return c == '<' }
+func (dsl *dslCollection) isRowEnd(c byte) bool     { return c == '>' }

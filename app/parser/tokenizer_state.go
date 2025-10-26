@@ -10,7 +10,10 @@ type dslTokenizerState struct {
 	isInArgValue  bool // Whether we're processing an argument value
 	isInStatement bool // Whether we're processing a statement
 	isInAssign    bool // Whether we're processing a variable assignment
+	isInForLoop   bool // Whether we're inside a for loop body
 	parens        int  // Nesting level of parentheses
+	slices        int  // Nesting level of slices
+	indexes       int  // Nesting level of indexes
 }
 
 func (s *dslTokenizerState) parenOpen()           { s.parens++ }
@@ -21,6 +24,7 @@ func (s *dslTokenizerState) waitingForArgs() bool { return s.isInCall && s.isInA
 func (s *dslTokenizerState) inCode() bool         { return !s.isInComment }
 func (s *dslTokenizerState) notInString() bool    { return !s.isInString }
 func (s *dslTokenizerState) notInEscape() bool    { return !s.isInEscape }
+func (s *dslTokenizerState) inEscape() bool       { return s.isInEscape }
 func (s *dslTokenizerState) notInCall() bool      { return !s.isInCall }
 func (s *dslTokenizerState) notInArgValue() bool  { return !s.isInArgValue }
 func (s *dslTokenizerState) stringStart()         { s.isInString = true }
@@ -43,6 +47,18 @@ func (s *dslTokenizerState) argValueStart()       { s.isInArgValue = true }
 func (s *dslTokenizerState) argValueEnd()         { s.isInArgValue = false }
 func (s *dslTokenizerState) inArgValue() bool     { return s.isInArgValue }
 func (s *dslTokenizerState) setArgValue(b bool)   { s.isInArgValue = b }
+func (s *dslTokenizerState) sliceOpen()           { s.slices++ }
+func (s *dslTokenizerState) sliceClose()          { s.slices-- }
+func (s *dslTokenizerState) inSlice() bool        { return s.slices > 0 }
+func (s *dslTokenizerState) notInSlice() bool     { return s.slices == 0 }
+func (s *dslTokenizerState) indexOpen()           { s.indexes++ }
+func (s *dslTokenizerState) indexClose()          { s.indexes-- }
+func (s *dslTokenizerState) inIndex() bool        { return s.indexes > 0 }
+func (s *dslTokenizerState) notInIndex() bool     { return s.indexes == 0 }
+func (s *dslTokenizerState) forLoopStart()        { s.isInForLoop = true }
+func (s *dslTokenizerState) forLoopEnd()          { s.isInForLoop = false }
+func (s *dslTokenizerState) inForLoop() bool      { return s.isInForLoop }
+func (s *dslTokenizerState) notInForLoop() bool   { return !s.isInForLoop }
 
 func (dsl *dslCollection) newState() *dslTokenizerState {
 	return &dslTokenizerState{
@@ -53,6 +69,9 @@ func (dsl *dslCollection) newState() *dslTokenizerState {
 		isInArgValue:  false,
 		isInStatement: true,
 		isInAssign:    false,
+		isInForLoop:   false,
 		parens:        0,
+		slices:        0,
+		indexes:       0,
 	}
 }

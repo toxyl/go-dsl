@@ -79,7 +79,7 @@ func (dsl *dslCollection) defaultColorTheme() *dslColorTheme {
 		Constants:            "#569CD6",
 		Functions:            "#FFD700",
 		VariableAssignments:  "#D7BA7D",
-		AssignmentOperators:  "#D4D4D4",
+		AssignmentOperators:  "#FFA500",
 		Types:                "#4EC9B0",
 		Classes:              "#4EC9B0",
 		Packages:             "#D7BA7D",
@@ -299,8 +299,29 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 					},
 				},
 				{
+					"match": "\\bfor\\b",
+					"name":  "keyword.control.for",
+				},
+				{
+					"match": "\\bdone\\b",
+					"name":  "keyword.control.done",
+				},
+				{
 					"name":  "constant.numeric",
-					"match": "\\b\\d+(\\.\\d+)?\\b",
+					"match": "[-+]?\\d+(?:\\.\\d+)?",
+				},
+				// Explicit assignment at line start: scopes both variable and operator
+				{
+					"name":  "meta.assignment",
+					"match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*([:=])",
+					"captures": map[string]any{
+						"1": map[string]any{"name": "variable.assign"},
+						"2": map[string]any{"name": "keyword.operator.assignment"},
+					},
+				},
+				{
+					"name":  "punctuation.section.brackets",
+					"match": "<|>",
 				},
 				{
 					"name":  "constant.language.boolean",
@@ -324,11 +345,11 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 				},
 				{
 					"name":  "entity.name.function",
-					"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*\\()",
+					"match": "[A-Za-z_][A-Za-z0-9_\\-]*(?=\\s*\\()",
 				},
 				{
 					"name":  "variable.other",
-					"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
+					"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?!\\s*\\()",
 				},
 			},
 		},
@@ -338,13 +359,29 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 			},
 			"brackets": [][]string{
 				{"(", ")"},
+				{"{", "}"},
+				{"[", "]"},
+				{"<", ">"},
+			},
+			// Explicitly enable angle bracket colorization; VS Code excludes < > by default
+			"colorizedBracketPairs": [][]string{
+				{"(", ")"},
+				{"{", "}"},
+				{"[", "]"},
+				{"<", ">"},
 			},
 			"autoClosingPairs": []map[string]string{
 				{"open": "(", "close": ")"},
+				{"open": "{", "close": "}"},
+				{"open": "[", "close": "]"},
+				{"open": "<", "close": ">"},
 				{"open": "\"", "close": "\""},
 			},
 			"surroundingPairs": []map[string]string{
 				{"open": "(", "close": ")"},
+				{"open": "{", "close": "}"},
+				{"open": "[", "close": "]"},
+				{"open": "<", "close": ">"},
 				{"open": "\"", "close": "\""},
 			},
 		},
@@ -368,6 +405,11 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 				"prefix":      "//",
 				"body":        []string{"# ${1:comment} #"},
 				"description": "Create a comment",
+			},
+			"For Loop": map[string]any{
+				"prefix":      "for",
+				"body":        []string{"for ${1:listName}[${2:i} ${3:item}]", "\t${4:# body #}", "done"},
+				"description": "Create a for loop",
 			},
 		},
 		"completions": map[string]any{
@@ -529,6 +571,11 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 					"settings": map[string]string{
 						"foreground": dsl.theme.Operators,
 					},
+				},
+				{
+					"name":     "Brackets",
+					"scope":    "punctuation.section.brackets",
+					"settings": map[string]string{"foreground": dsl.theme.Operators},
 				},
 				{
 					"name":  "Arithmetic Operators",
@@ -908,7 +955,7 @@ export function deactivate() {}`, dsl.id)
 	}
 
 	// Package the extension
-	cmd = exec.Command("npx", "vsce", "package", "-o", pathToVSIXFile)
+	cmd = exec.Command("npx", "vsce", "package", "-o", flo.File(pathToVSIXFile).Path())
 	cmd.Dir = tmpDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {

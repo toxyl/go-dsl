@@ -14,6 +14,8 @@ type dslTokenizerState struct {
 	parens        int  // Nesting level of parentheses
 	slices        int  // Nesting level of slices
 	indexes       int  // Nesting level of indexes
+	Line          int  // Current line number (1-based)
+	Column        int  // Current column number (1-based)
 }
 
 func (s *dslTokenizerState) parenOpen()           { s.parens++ }
@@ -55,10 +57,6 @@ func (s *dslTokenizerState) indexOpen()           { s.indexes++ }
 func (s *dslTokenizerState) indexClose()          { s.indexes-- }
 func (s *dslTokenizerState) inIndex() bool        { return s.indexes > 0 }
 func (s *dslTokenizerState) notInIndex() bool     { return s.indexes == 0 }
-func (s *dslTokenizerState) forLoopStart()        { s.isInForLoop = true }
-func (s *dslTokenizerState) forLoopEnd()          { s.isInForLoop = false }
-func (s *dslTokenizerState) inForLoop() bool      { return s.isInForLoop }
-func (s *dslTokenizerState) notInForLoop() bool   { return !s.isInForLoop }
 
 func (dsl *dslCollection) newState() *dslTokenizerState {
 	return &dslTokenizerState{
@@ -73,5 +71,7 @@ func (dsl *dslCollection) newState() *dslTokenizerState {
 		parens:        0,
 		slices:        0,
 		indexes:       0,
+		Line:          1,
+		Column:        1,
 	}
 }

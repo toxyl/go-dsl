@@ -12,21 +12,25 @@ import (
 	"github.com/toxyl/math"
 )
 
+var (
+	NumColorConversionWorkers = runtime.NumCPU()
+)
+
 // castSelfOnly handles casting for types that can only be cast to themselves
-func castSelfOnly[T any](dsl *dslCollection, value T, targetType, typeName string) (any, error) {
+func castSelfOnly[T any](value T, targetType, typeName string) (any, error) {
 	if targetType == typeName || targetType == "language."+typeName {
 		return value, nil
 	}
 	if targetType == "*"+typeName || targetType == "*language."+typeName {
 		return value, nil
 	}
-	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+	return nil, errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 }
 
 // cast attempts to convert a value to the target type
 func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 	if value == nil {
-		return nil, dsl.errors.NIL_CAST()
+		return nil, errors.NIL_CAST()
 	}
 
 	// Handle slice types before the main switch
@@ -44,7 +48,7 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 				return result, nil
 			}
 			// Slice-to-slice conversions (except []any) are not allowed
-			return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+			return nil, errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 		}
 	}
 
@@ -56,32 +60,32 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 	case color.RGBA, color.RGBA64:
 		return dsl.castColor(value, targetType)
 	case Point:
-		return castSelfOnly(dsl, value, targetType, "Point")
+		return castSelfOnly(value, targetType, "Point")
 	case Rect:
-		return castSelfOnly(dsl, value, targetType, "Rect")
+		return castSelfOnly(value, targetType, "Rect")
 	case NGon:
-		return castSelfOnly(dsl, value, targetType, "NGon")
+		return castSelfOnly(value, targetType, "NGon")
 	case Triangle:
-		return castSelfOnly(dsl, value, targetType, "Triangle")
+		return castSelfOnly(value, targetType, "Triangle")
 	case Quad:
-		return castSelfOnly(dsl, value, targetType, "Quad")
+		return castSelfOnly(value, targetType, "Quad")
 	case Ellipse:
-		return castSelfOnly(dsl, value, targetType, "Ellipse")
+		return castSelfOnly(value, targetType, "Ellipse")
 	case Vector:
-		return castSelfOnly(dsl, value, targetType, "Vector")
+		return castSelfOnly(value, targetType, "Vector")
 	case Text:
-		return castSelfOnly(dsl, value, targetType, "Text")
+		return castSelfOnly(value, targetType, "Text")
 	case LineStyle:
-		return castSelfOnly(dsl, value, targetType, "LineStyle")
+		return castSelfOnly(value, targetType, "LineStyle")
 	case FillStyle:
-		return castSelfOnly(dsl, value, targetType, "FillStyle")
+		return castSelfOnly(value, targetType, "FillStyle")
 	case TextStyle:
-		return castSelfOnly(dsl, value, targetType, "TextStyle")
+		return castSelfOnly(value, targetType, "TextStyle")
 	// TODO: NEW TYPES: add additional types
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
 	default:
 		// If we get here the type is not supported
-		return nil, dsl.errors.UNSUPPORTED_SOURCE_TYPE(value)
+		return nil, errors.UNSUPPORTED_SOURCE_TYPE(value)
 	}
 
 	// Handle string inputs
@@ -103,7 +107,7 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 			return dsl.castToType(f, targetType)
 		}
 
-		return nil, dsl.errors.STRING_CAST(str, targetType)
+		return nil, errors.STRING_CAST(str, targetType)
 	}
 
 	return dsl.castToType(value, targetType)
@@ -387,7 +391,7 @@ func (dsl *dslCollection) castToType(value any, targetType string) (any, error) 
 			return result, nil
 		}
 	}
-	return nil, dsl.errors.UNSUPPORTED_TARGET_TYPE(targetType)
+	return nil, errors.UNSUPPORTED_TARGET_TYPE(targetType)
 }
 
 // castImage handles conversions between different image types
@@ -438,7 +442,7 @@ func (dsl *dslCollection) castImage(value any, targetType string) (any, error) {
 			return dsl.convertNRGBA64ToNRGBA(v), nil
 		}
 	}
-	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+	return nil, errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 }
 
 // Helper functions for image conversions
@@ -449,7 +453,7 @@ func (dsl *dslCollection) convertNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
 		b = b1 * a1 / 255
 		a = a1
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 func (dsl *dslCollection) convertRGBAToNRGBA(src *image.RGBA) *image.NRGBA {
@@ -462,7 +466,7 @@ func (dsl *dslCollection) convertRGBAToNRGBA(src *image.RGBA) *image.NRGBA {
 		b = b1 * 255 / a1
 		a = a1
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 func (dsl *dslCollection) convertRGBA64ToNRGBA64(src *image.RGBA64) *image.NRGBA64 {
@@ -475,7 +479,7 @@ func (dsl *dslCollection) convertRGBA64ToNRGBA64(src *image.RGBA64) *image.NRGBA
 		b = (b1 * 0xFFFF) / a1
 		a = a1
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 func (dsl *dslCollection) convertNRGBA64ToRGBA64(src *image.NRGBA64) *image.RGBA64 {
@@ -488,7 +492,7 @@ func (dsl *dslCollection) convertNRGBA64ToRGBA64(src *image.NRGBA64) *image.RGBA
 		b = (b1 * a1) / 0xFFFF
 		a = a1
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertNRGBAToNRGBA64 converts an 8-bit non-premultiplied RGBA image to 16-bit
@@ -502,7 +506,7 @@ func (dsl *dslCollection) convertNRGBAToNRGBA64(src *image.NRGBA) *image.NRGBA64
 		b = b1 * 257
 		a = a1
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertRGBAToRGBA64 converts an 8-bit premultiplied RGBA image to 16-bit
@@ -516,7 +520,7 @@ func (dsl *dslCollection) convertRGBAToRGBA64(src *image.RGBA) *image.RGBA64 {
 		b = b1 * 257
 		a = a1
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertRGBAToNRGBA64 converts an 8-bit premultiplied RGBA image to 16-bit non-premultiplied
@@ -530,7 +534,7 @@ func (dsl *dslCollection) convertRGBAToNRGBA64(src *image.RGBA) *image.NRGBA64 {
 		b = (b1 * 0xFFFF) / a1
 		a = a1 * 257
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertNRGBA64ToNRGBA converts a 16-bit non-premultiplied RGBA image to 8-bit
@@ -544,7 +548,7 @@ func (dsl *dslCollection) convertNRGBA64ToNRGBA(src *image.NRGBA64) *image.NRGBA
 		b = (b1 >> 8)
 		a = (a1 >> 8)
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertRGBA64ToRGBA converts a 16-bit premultiplied RGBA image to 8-bit
@@ -558,7 +562,7 @@ func (dsl *dslCollection) convertRGBA64ToRGBA(src *image.RGBA64) *image.RGBA {
 		b = (b1 >> 8)
 		a = (a1 >> 8)
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertRGBA64ToNRGBA converts a 16-bit premultiplied RGBA image to 8-bit non-premultiplied
@@ -572,7 +576,7 @@ func (dsl *dslCollection) convertRGBA64ToNRGBA(src *image.RGBA64) *image.NRGBA {
 		b = (b1 * 0xFFFF) / (a1 >> 8)
 		a = a1 >> 8
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertNRGBA64ToRGBA converts a 16-bit non-premultiplied RGBA image to 8-bit premultiplied
@@ -587,7 +591,7 @@ func (dsl *dslCollection) convertNRGBA64ToRGBA(src *image.NRGBA64) *image.RGBA {
 		b = (b1 * a8) / 0xFF >> 8
 		a = a8
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // convertNRGBAToRGBA64 converts an 8-bit non-premultiplied RGBA image to 16-bit premultiplied
@@ -602,7 +606,7 @@ func (dsl *dslCollection) convertNRGBAToRGBA64(src *image.NRGBA) *image.RGBA64 {
 		b = ((b1 * 257) * a16) / 0xFFFF
 		a = a16
 		return
-	}, runtime.NumCPU())
+	}, NumColorConversionWorkers)
 }
 
 // castColor handles conversions between different color types
@@ -742,7 +746,7 @@ func (dsl *dslCollection) castColor(value any, targetType string) (any, error) {
 			}, nil
 		}
 	}
-	return nil, dsl.errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
+	return nil, errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 }
 
 // toFloat64 converts any numeric value to float64.
@@ -781,11 +785,11 @@ func (dsl *dslCollection) toFloat64(value any) (float64, error) {
 	case string:
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return 0, dsl.errors.CAST_NOT_POSSIBLE("string", "float64")
+			return 0, errors.CAST_NOT_POSSIBLE("string", "float64")
 		}
 		return f, nil
 	default:
-		return 0, dsl.errors.UNSUPPORTED_SOURCE_TYPE(value)
+		return 0, errors.UNSUPPORTED_SOURCE_TYPE(value)
 	}
 }
 

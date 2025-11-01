@@ -6,6 +6,8 @@ import (
 )
 
 func (dsl *dslCollection) initDSL(id, name, description, version, extension string, theme *dslColorTheme) {
+	dsl.mu.Lock()
+	defer dsl.mu.Unlock()
 	if theme == nil {
 		theme = dsl.defaultColorTheme()
 	}
@@ -18,29 +20,32 @@ func (dsl *dslCollection) initDSL(id, name, description, version, extension stri
 	dsl.tokenizer = &dslTokenizer{
 		source: "",
 		pos:    0,
-		token:  dsl.newToken("", dsl.tokens.invalid),
+		token:  dsl.newToken("", tokens.invalid),
 		state:  dsl.newState(),
 		tokens: []*dslToken{},
 	}
 	dsl.vars = &dslVarRegistry{
-		lock: &sync.Mutex{},
+		mu:   &sync.Mutex{},
 		data: make(map[string]*dslMetaVarType),
 		state: &dslRegistryState{
 			data:      make(map[string]any),
 			new:       make(map[string]any),
+			mu:        &sync.Mutex{},
 			protected: false,
 		},
 	}
 	dsl.funcs = &dslFnRegistry{
-		lock: &sync.Mutex{},
+		mu:   &sync.Mutex{},
 		data: make(map[string]*dslFnType),
 		state: &dslRegistryState{
 			data:      make(map[string]any),
 			new:       make(map[string]any),
+			mu:        &sync.Mutex{},
 			protected: false,
 		},
 	}
 	dsl.parser = &dslParser{
+		dsl:       dsl,
 		curr:      nil,
 		next:      nil,
 		prev:      nil,
@@ -61,7 +66,7 @@ func (dsl *dslCollection) load(script string, args ...any) {
 	dsl.tokenizer.tokens = []*dslToken{}
 	dsl.tokenizer.pos = 0
 	dsl.tokenizer.state = dsl.newState()
-	dsl.tokenizer.token = dsl.newToken("", dsl.tokens.invalid)
+	dsl.tokenizer.token = dsl.newToken("", tokens.invalid)
 	dsl.parser.pos = -1
 	dsl.parser.tokens = []*dslToken{}
 	dsl.parser.formatted = ""
@@ -77,15 +82,17 @@ func (dsl *dslCollection) load(script string, args ...any) {
 // The debug parameter enables verbose output of the execution process.
 // The args parameter allows passing arguments to the script.
 func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResult, error) {
+	dsl.mu.Lock()
+	defer dsl.mu.Unlock()
 	dsl.trimSpace(&script)
 	dsl.load(script, args...)
 
 	if err := dsl.tokenizer.tokenize(); err != nil {
-		return nil, err
+		return nil, formatErrorWithPosition(err, dsl.tokenizer.source, dsl.tokenizer.state.Line, dsl.tokenizer.state.Column)
 	}
 
 	if err := dsl.tokenizer.lex(); err != nil {
-		return nil, err
+		return nil, formatErrorWithPosition(err, dsl.tokenizer.source, dsl.tokenizer.state.Line, dsl.tokenizer.state.Column)
 	}
 
 	dsl.parser.tokens = dsl.tokenizer.getTokens()
@@ -97,41 +104,41 @@ func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResul
 	if len(dsl.parser.tokens) == 1 {
 		token := dsl.parser.tokens[0]
 		switch token.Type {
-		case dsl.tokens.argRef:
+		case tokens.argRef:
 			firstNode = &dslNode{
-				kind:     dsl.nodes.argRef,
+				kind:     nodes.argRef,
 				data:     token.Value,
 				children: []*dslNode{},
 				named:    false,
 				argName:  "",
 			}
-		case dsl.tokens.integer:
+		case tokens.integer:
 			firstNode = &dslNode{
-				kind:     dsl.nodes.integer,
+				kind:     nodes.integer,
 				data:     token.Value,
 				children: []*dslNode{},
 				named:    false,
 				argName:  "",
 			}
-		case dsl.tokens.float:
+		case tokens.float:
 			firstNode = &dslNode{
-				kind:     dsl.nodes.float,
+				kind:     nodes.float,
 				data:     token.Value,
 				children: []*dslNode{},
 				named:    false,
 				argName:  "",
 			}
-		case dsl.tokens.str:
+		case tokens.str:
 			firstNode = &dslNode{
-				kind:     dsl.nodes.str,
+				kind:     nodes.str,
 				data:     token.Value,
 				children: []*dslNode{},
 				named:    false,
 				argName:  "",
 			}
-		case dsl.tokens.boolean:
+		case tokens.boolean:
 			firstNode = &dslNode{
-				kind:     dsl.nodes.boolean,
+				kind:     nodes.boolean,
 				data:     token.Value,
 				children: []*dslNode{},
 				named:    false,
@@ -139,7 +146,7 @@ func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResul
 			}
 		default:
 			firstNode = &dslNode{
-				kind:     dsl.nodes.varRef,
+				kind:     nodes.varRef,
 				data:     token.Value,
 				children: []*dslNode{},
 				named:    false,
@@ -149,16 +156,16 @@ func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResul
 	}
 
 	for dsl.parser.advance() {
-		if dsl.parser.curr.Type == dsl.tokens.terminator {
+		if dsl.parser.curr.Type == tokens.terminator {
 			continue
 		}
-		if dsl.parser.curr.Type == dsl.tokens.comment {
+		if dsl.parser.curr.Type == tokens.comment {
 			continue
 		}
 
 		node, err := dsl.parser.parseNode()
 		if err != nil {
-			return nil, err
+			return nil, formatErrorWithPosition(err, dsl.tokenizer.source, dsl.tokenizer.state.Line, dsl.tokenizer.state.Column)
 		}
 		if node != nil {
 			if firstNode == nil {
@@ -173,30 +180,50 @@ func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResul
 		}
 	}
 
-	dsl.ast = firstNode
+	ast := firstNode
 
-	var result *dslResult
-	for dsl.ast != nil {
-		if debug {
-			fmt.Println(dsl.ast.toTree())
+	if ast == nil {
+		if len(dsl.parser.tokens) == 0 {
+			return nil, fmt.Errorf("script is empty")
 		}
-		res, err := dsl.parser.evaluateNode(dsl.ast)
-		result = &dslResult{res, err}
-		if err != nil {
-			break
-		}
-		dsl.ast = dsl.ast.next
+		return nil, fmt.Errorf("no nodes to evaluate: script may be empty or contain only comments")
 	}
 
+	var result *dslResult
+	for ast != nil {
+		if debug {
+			fmt.Println(ast.toTree())
+		}
+		res, err := dsl.parser.evaluateNode(ast)
+		result = &dslResult{res, err}
+		if err != nil {
+			// Use node position if available, otherwise fall back to tokenizer state
+			line, col := dsl.tokenizer.state.Line, dsl.tokenizer.state.Column
+			if ast.Line > 0 {
+				line, col = ast.Line, ast.Column
+			}
+			result.err = formatErrorWithPosition(err, dsl.tokenizer.source, line, col)
+			break
+		}
+		ast = ast.next
+	}
+
+	if result == nil {
+		return nil, fmt.Errorf("no result from evaluation")
+	}
 	return result, result.err
 }
 
 func (dsl *dslCollection) storeState() {
+	dsl.mu.Lock()
+	defer dsl.mu.Unlock()
 	dsl.vars.storeState()
 	dsl.funcs.storeState()
 }
 
 func (dsl *dslCollection) restoreState() {
+	dsl.mu.Lock()
+	defer dsl.mu.Unlock()
 	dsl.vars.restoreState()
 	dsl.funcs.restoreState()
 }

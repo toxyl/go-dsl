@@ -35,44 +35,44 @@ func (dsl *dslCollection) replaceInToken(token *dslToken, search, replace string
 func (dsl *dslCollection) appendToken(token *dslToken, value string) { token.Value += value }
 
 func (dsl *dslCollection) isCallEndToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.callEnd
+	return token.Type == tokens.callEnd
 }
 func (dsl *dslCollection) isCallStartToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.callStart
+	return token.Type == tokens.callStart
 }
 func (dsl *dslCollection) isAssignToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.assign
+	return token.Type == tokens.assign
 }
 func (dsl *dslCollection) isTerminatorToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.terminator
+	return token.Type == tokens.terminator
 }
 func (dsl *dslCollection) isCommentToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.comment
+	return token.Type == tokens.comment
 }
 func (dsl *dslCollection) isStringToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.str
+	return token.Type == tokens.str
 }
 func (dsl *dslCollection) isArgValueToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.argValue
+	return token.Type == tokens.argValue
 }
 func (dsl *dslCollection) isInvalidToken(token *dslToken) bool {
-	return token.Type == dsl.tokens.invalid
+	return token.Type == tokens.invalid
 }
 func (dsl *dslCollection) isEmptyToken(token *dslToken) bool { return token.Value == "" }
 
 func (dsl *dslCollection) isNotEmptyToken(token *dslToken) bool { return token.Value != "" }
 func (dsl *dslCollection) isNotStringToken(token *dslToken) bool {
-	return token.Type != dsl.tokens.str
+	return token.Type != tokens.str
 }
 func (dsl *dslCollection) isNotCommentToken(token *dslToken) bool {
-	return token.Type != dsl.tokens.comment
+	return token.Type != tokens.comment
 }
 func (dsl *dslCollection) isNotCallStartToken(token *dslToken) bool {
-	return token.Type != dsl.tokens.callStart
+	return token.Type != tokens.callStart
 }
 func (dsl *dslCollection) isNotAssignToken(token *dslToken) bool {
-	return token.Type != dsl.tokens.assign
+	return token.Type != tokens.assign
 }
 func (dsl *dslCollection) isNotTerminatorToken(token *dslToken) bool {
-	return token.Type != dsl.tokens.terminator
+	return token.Type != tokens.terminator
 }

@@ -39,40 +39,40 @@ func (fn *dslFnType) validate(args ...any) error {
 		case "int":
 			val, ok := arg.(int)
 			if !ok {
-				return dsl.errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "int", arg)
+				return errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "int", arg)
 			}
 			if min, ok := param.min.(int); ok && val < min {
-				return dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
+				return errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
 			}
 			if max, ok := param.max.(int); ok && val > max {
-				return dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
+				return errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
 			}
 		case "float":
 			val, ok := arg.(float64)
 			if !ok {
-				return dsl.errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "float64", arg)
+				return errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "float64", arg)
 			}
 			if min, ok := param.min.(float64); ok && val < min {
-				return dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
+				return errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
 			}
 			if max, ok := param.max.(float64); ok && val > max {
-				return dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
+				return errors.REG_VALIDATION_OUT_OF_BOUNDS("parameter", param.name, param.min, param.max, val)
 			}
 		case "bool":
 			_, ok := arg.(bool)
 			if !ok {
-				return dsl.errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "bool", arg)
+				return errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "bool", arg)
 			}
 		case "string":
 			val, ok := arg.(string)
 			if !ok {
-				return dsl.errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "string", arg)
+				return errors.REG_VALIDATION_WRONG_TYPE("parameter", param.name, "string", arg)
 			}
 			if min, ok := param.min.(int); ok && len(val) < min {
-				return dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS_LENGTH("parameter", param.name, param.min, param.max, val)
+				return errors.REG_VALIDATION_OUT_OF_BOUNDS_LENGTH("parameter", param.name, param.min, param.max, val)
 			}
 			if max, ok := param.max.(int); ok && len(val) > max {
-				return dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS_LENGTH("parameter", param.name, param.min, param.max, val)
+				return errors.REG_VALIDATION_OUT_OF_BOUNDS_LENGTH("parameter", param.name, param.min, param.max, val)
 			}
 
 		}
@@ -80,7 +80,7 @@ func (fn *dslFnType) validate(args ...any) error {
 	return nil
 }
 
-func (f *dslFnType) call(args ...any) (any, error) {
+func (f *dslFnType) call(vars *dslVarRegistry, args ...any) (any, error) {
 	// Make a copy of args to avoid modifying the original
 	callArgs := make([]any, len(args))
 	copy(callArgs, args)
@@ -89,9 +89,9 @@ func (f *dslFnType) call(args ...any) (any, error) {
 	for i, arg := range callArgs {
 		if str, ok := arg.(string); ok {
 			// Check if it's a variable reference
-			if dsl.vars.has(str) {
+			if vars.has(str) {
 				// Get the variable value in a thread-safe way
-				varVal := dsl.vars.get(str)
+				varVal := vars.get(str)
 				if varVal != nil {
 					callArgs[i] = varVal.get()
 				}

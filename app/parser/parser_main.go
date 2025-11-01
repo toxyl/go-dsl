@@ -15,14 +15,15 @@ type dslResult struct {
 // dslParser is the main dslParser type that converts tokens into an AST.
 // It maintains the current position in the token stream and handles parsing state.
 type dslParser struct {
-	curr      *dslToken   // Current token being processed
-	next      *dslToken   // Next token to be processed
-	prev      *dslToken   // Previously processed token
-	tokens    []*dslToken // All tokens to be processed
-	pos       int         // Current position in token stream
-	formatted string      // Formatted source code
-	types     string      // Token types for debugging
-	args      []any       // Script arguments
+	dsl       *dslCollection // Reference to the dslCollection instance
+	curr      *dslToken      // Current token being processed
+	next      *dslToken      // Next token to be processed
+	prev      *dslToken      // Previously processed token
+	tokens    []*dslToken    // All tokens to be processed
+	pos       int            // Current position in token stream
+	formatted string         // Formatted source code
+	types     string         // Token types for debugging
+	args      []any          // Script arguments
 }
 
 // advance advances the parser to the next token.
@@ -48,65 +49,65 @@ func (p *dslParser) advance() (hasMore bool) {
 // Returns an error if the argument syntax is invalid.
 func (p *dslParser) parseArgument() (*dslNode, error) {
 	if p.curr == nil {
-		return nil, dsl.errors.PSR_EXPECTED_ARG()
+		return nil, errors.PSR_EXPECTED_ARG()
 	}
 
 	switch p.curr.Type {
-	case dsl.tokens.comment:
+	case tokens.comment:
 		return nil, nil
-	case dsl.tokens.varRef:
+	case tokens.varRef:
 		return &dslNode{
-			kind: dsl.nodes.varRef,
+			kind: nodes.varRef,
 			data: p.curr.Value,
 		}, nil
-	case dsl.tokens.argRef:
+	case tokens.argRef:
 		return &dslNode{
-			kind: dsl.nodes.argRef,
+			kind: nodes.argRef,
 			data: p.curr.Value,
 		}, nil
-	case dsl.tokens.integer:
+	case tokens.integer:
 		val, err := strconv.Atoi(p.curr.Value)
 		if err != nil {
 			return nil, err
 		}
 		return &dslNode{
-			kind: dsl.nodes.integer,
+			kind: nodes.integer,
 			data: strconv.Itoa(val),
 		}, nil
-	case dsl.tokens.float:
+	case tokens.float:
 		val, err := strconv.ParseFloat(p.curr.Value, 64)
 		if err != nil {
 			return nil, err
 		}
 		return &dslNode{
-			kind: dsl.nodes.float,
+			kind: nodes.float,
 			data: strconv.FormatFloat(val, 'f', -1, 64),
 		}, nil
-	case dsl.tokens.str:
+	case tokens.str:
 		return &dslNode{
-			kind: dsl.nodes.str,
+			kind: nodes.str,
 			data: p.curr.Value,
 		}, nil
-	case dsl.tokens.boolean:
+	case tokens.boolean:
 		val, err := strconv.ParseBool(p.curr.Value)
 		if err != nil {
 			return nil, err
 		}
 		return &dslNode{
-			kind: dsl.nodes.boolean,
+			kind: nodes.boolean,
 			data: strconv.FormatBool(val),
 		}, nil
-	case dsl.tokens.null:
+	case tokens.null:
 		return &dslNode{
-			kind: dsl.nodes.arg,
+			kind: nodes.arg,
 			data: "nil",
 		}, nil
-	case dsl.tokens.callStart:
+	case tokens.callStart:
 		return p.parseCall()
-	case dsl.tokens.sliceStart:
+	case tokens.sliceStart:
 		return p.parseSlice()
 	default:
-		return nil, dsl.errors.PSR_UNEXPECTED_TOKEN_TYPE(p.curr)
+		return nil, errors.PSR_UNEXPECTED_TOKEN_TYPE(p.curr)
 	}
 }
 
@@ -117,19 +118,21 @@ func (p *dslParser) parseArgument() (*dslNode, error) {
 // parsing fails.
 func (p *dslParser) parseCall() (*dslNode, error) {
 	node := &dslNode{
-		kind: dsl.nodes.call,
-		data: strings.TrimSuffix(p.curr.Value, "("),
+		kind:   nodes.call,
+		data:   strings.TrimSuffix(p.curr.Value, "("),
+		Line:   p.curr.Line,
+		Column: p.curr.Column,
 	}
 
 	// Parse arguments
 	for p.advance() {
-		if p.curr.Type == dsl.tokens.callEnd {
+		if p.curr.Type == tokens.callEnd {
 			break
 		}
-		if p.curr.Type == dsl.tokens.comment {
+		if p.curr.Type == tokens.comment {
 			continue
 		}
-		if p.curr.Type == dsl.tokens.sliceEnd {
+		if p.curr.Type == tokens.sliceEnd {
 			// End of loop body reached
 			break
 		}
@@ -157,27 +160,27 @@ func (p *dslParser) parseSlice() (*dslNode, error) {
 	sawRow := false
 
 	for p.advance() {
-		if p.curr.Type == dsl.tokens.sliceEnd {
+		if p.curr.Type == tokens.sliceEnd {
 			break
 		}
-		if p.curr.Type == dsl.tokens.space || p.curr.Value == "" {
+		if p.curr.Type == tokens.space || p.curr.Value == "" {
 			continue
 		}
-		if p.curr.Type == dsl.tokens.comment {
+		if p.curr.Type == tokens.comment {
 			continue
 		}
-		if p.curr.Type == dsl.tokens.rowStart {
+		if p.curr.Type == tokens.rowStart {
 			sawRow = true
-			row := &dslNode{kind: dsl.nodes.row}
+			row := &dslNode{kind: nodes.row}
 			// collect row elements until rowEnd
 			for p.advance() {
-				if p.curr.Type == dsl.tokens.rowEnd {
+				if p.curr.Type == tokens.rowEnd {
 					break
 				}
-				if p.curr.Type == dsl.tokens.space || p.curr.Value == "" {
+				if p.curr.Type == tokens.space || p.curr.Value == "" {
 					continue
 				}
-				if p.curr.Type == dsl.tokens.comment {
+				if p.curr.Type == tokens.comment {
 					continue
 				}
 				arg, err := p.parseNode()
@@ -202,57 +205,62 @@ func (p *dslParser) parseSlice() (*dslNode, error) {
 		}
 	}
 
-	if sawRow {
-		return &dslNode{kind: dsl.nodes.matrix, children: rows}, nil
+	if sawRow && len(elements) > 0 {
+		// Mixed content: create slice, treat rows as elements
+		elements = append(elements, rows...)
+		return &dslNode{kind: nodes.slice, children: elements}, nil
 	}
-	return &dslNode{kind: dsl.nodes.slice, children: elements}, nil
+	if sawRow {
+		return &dslNode{kind: nodes.matrix, children: rows}, nil
+	}
+	return &dslNode{kind: nodes.slice, children: elements}, nil
 }
 
 // parseForRange parses a for loop construct: for target[vars]{ body }
 func (p *dslParser) parseForRange() (*dslNode, error) {
 	node := &dslNode{
-		kind: dsl.nodes.forRange,
+		kind: nodes.forRange,
 	}
 
 	if !p.advance() {
-		return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+		return nil, errors.PSR_FOR_INVALID_VARS()
 	}
 
 	targetName := p.curr.Value
 	target := &dslNode{
-		kind: dsl.nodes.varRef,
+		kind: nodes.varRef,
 		data: targetName,
 	}
 	node.children = append(node.children, target)
 
 	if !p.advance() {
-		return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+		return nil, errors.PSR_FOR_INVALID_VARS()
 	}
 
-	if p.curr.Type != dsl.tokens.indexStart {
-		return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+	if p.curr.Type != tokens.indexStart {
+		return nil, errors.PSR_FOR_INVALID_VARS()
 	}
 
 	varNames := []string{}
 	for p.advance() {
-		if p.curr.Type == dsl.tokens.indexEnd || p.curr.Type == dsl.tokens.terminator {
+		if p.curr.Type == tokens.indexEnd || p.curr.Type == tokens.terminator {
 			break
 		}
-		if p.curr.Type == dsl.tokens.space || p.curr.Value == "" {
+		if p.curr.Type == tokens.space || p.curr.Value == "" {
 			continue
 		}
-		if p.curr.Type == dsl.tokens.comment {
+		if p.curr.Type == tokens.comment {
 			continue
 		}
-		if p.curr.Type == dsl.tokens.varRef {
+		if p.curr.Type == tokens.varRef {
 			varNames = append(varNames, p.curr.Value)
 		} else {
-			return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+			return nil, errors.PSR_FOR_INVALID_VARS()
 		}
 	}
 
 	if len(varNames) == 0 {
-		return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+		return nil, errors.PSR_FOR_INVALID_VARS()
 	}
 
 	node.data = strings.Join(varNames, " ")
@@ -260,7 +268,7 @@ func (p *dslParser) parseForRange() (*dslNode, error) {
 	bodyStatements := []*dslNode{}
 
 	if !p.advance() {
-		return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+		return nil, errors.PSR_FOR_INVALID_VARS()
 	}
 
 	for {
@@ -268,17 +276,17 @@ func (p *dslParser) parseForRange() (*dslNode, error) {
 			break
 		}
 
-		if p.curr.Type == dsl.tokens.done {
+		if p.curr.Type == tokens.done {
 			break
 		}
 
-		if p.curr.Type == dsl.tokens.space || p.curr.Value == "" {
+		if p.curr.Type == tokens.space || p.curr.Value == "" {
 			if !p.advance() {
 				break
 			}
 			continue
 		}
-		if p.curr.Type == dsl.tokens.comment {
+		if p.curr.Type == tokens.comment {
 			if !p.advance() {
 				break
 			}
@@ -300,7 +308,7 @@ func (p *dslParser) parseForRange() (*dslNode, error) {
 	}
 
 	if len(bodyStatements) == 0 {
-		return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+		return nil, errors.PSR_FOR_INVALID_VARS()
 	}
 
 	node.children = append(node.children, bodyStatements...)
@@ -313,33 +321,33 @@ func (p *dslParser) parseForRange() (*dslNode, error) {
 func (p *dslParser) parseIndex(base *dslNode) (*dslNode, error) {
 	// current is indexStart '['; consume tokens until matching indexEnd, building sub-parser slice
 	depth := 1
-	tokens := make([]*dslToken, 0)
+	res := make([]*dslToken, 0)
 	for p.advance() {
-		if p.curr.Type == dsl.tokens.indexStart {
+		if p.curr.Type == tokens.indexStart {
 			depth++
-		} else if p.curr.Type == dsl.tokens.indexEnd {
+		} else if p.curr.Type == tokens.indexEnd {
 			depth--
 			if depth == 0 {
 				break
 			}
 		}
-		tokens = append(tokens, p.curr)
+		res = append(res, p.curr)
 	}
 	if depth != 0 {
-		return nil, dsl.errors.PSR_UNEXPECTED_CLOSING_PAREN()
+		return nil, errors.PSR_UNEXPECTED_CLOSING_PAREN()
 	}
-	if len(tokens) == 0 {
-		return nil, dsl.errors.PSR_EXPECTED_ARG()
+	if len(res) == 0 {
+		return nil, errors.PSR_EXPECTED_ARG()
 	}
 	// Parse one or two expressions from tokens
-	sub := &dslParser{curr: nil, next: nil, prev: nil, tokens: tokens, formatted: "", types: "", pos: -1, args: []any{}}
+	sub := &dslParser{curr: nil, next: nil, prev: nil, tokens: res, formatted: "", types: "", pos: -1, args: []any{}}
 	idxParts := make([]*dslNode, 0, 2)
 	for sub.advance() {
-		if sub.curr.Type == dsl.tokens.terminator || sub.curr.Value == "" || sub.curr.Type == dsl.tokens.space {
+		if sub.curr.Type == tokens.terminator || sub.curr.Value == "" || sub.curr.Type == tokens.space {
 			continue
 		}
 		// Stop if unexpected closing encountered
-		if sub.curr.Type == dsl.tokens.indexEnd {
+		if sub.curr.Type == tokens.indexEnd {
 			break
 		}
 		n, err := sub.parseArgument()
@@ -349,16 +357,16 @@ func (p *dslParser) parseIndex(base *dslNode) (*dslNode, error) {
 		if n != nil {
 			idxParts = append(idxParts, n)
 			if len(idxParts) > 2 {
-				return nil, dsl.errors.PSR_PARAM_TOO_MANY("index")
+				return nil, errors.PSR_PARAM_TOO_MANY("index")
 			}
 		}
 	}
 	if len(idxParts) == 0 {
-		return nil, dsl.errors.PSR_EXPECTED_ARG()
+		return nil, errors.PSR_EXPECTED_ARG()
 	}
 	children := []*dslNode{base}
 	children = append(children, idxParts...)
-	return &dslNode{kind: dsl.nodes.index, children: children}, nil
+	return &dslNode{kind: nodes.index, children: children}, nil
 }
 
 // parseNode parses a single node from the token stream.
@@ -366,113 +374,123 @@ func (p *dslParser) parseIndex(base *dslNode) (*dslNode, error) {
 // Returns an error if the token sequence is invalid.
 func (p *dslParser) parseNode() (*dslNode, error) {
 	switch p.curr.Type {
-	case dsl.tokens.comment:
+	case tokens.comment:
 		return nil, nil
-	case dsl.tokens.str:
+	case tokens.str:
 		return &dslNode{
-			kind: dsl.nodes.str,
+			kind: nodes.str,
 			data: p.curr.Value,
 		}, nil
-	case dsl.tokens.argRef:
+	case tokens.argRef:
 		return &dslNode{
-			kind: dsl.nodes.argRef,
+			kind: nodes.argRef,
 			data: p.curr.Value,
 		}, nil
-	case dsl.tokens.forLoop:
+	case tokens.forLoop:
 		return p.parseForRange()
-	case dsl.tokens.callStart:
+	case tokens.callStart:
 		return p.parseCall()
-	case dsl.tokens.sliceStart:
+	case tokens.sliceStart:
 		return p.parseSlice()
-	case dsl.tokens.sliceEnd:
+	case tokens.sliceEnd:
 		return nil, nil
-	case dsl.tokens.indexEnd:
+	case tokens.indexEnd:
 		return nil, nil
-	case dsl.tokens.callEnd:
+	case tokens.callEnd:
 		parens := 0
 		sliceDepth := 0
 		for _, t := range p.tokens {
 			switch t.Type {
-			case dsl.tokens.sliceStart:
+			case tokens.sliceStart:
 				sliceDepth++
-			case dsl.tokens.sliceEnd:
+			case tokens.sliceEnd:
 				sliceDepth--
-			case dsl.tokens.callStart:
+			case tokens.callStart:
 				if sliceDepth == 0 {
 					parens++
 				}
-			case dsl.tokens.callEnd:
+			case tokens.callEnd:
 				if sliceDepth == 0 {
 					parens--
 				}
 			}
 		}
 		if parens < 0 {
-			return nil, dsl.errors.PSR_UNEXPECTED_CLOSING_PAREN()
+			return nil, errors.PSR_UNEXPECTED_CLOSING_PAREN()
 		} else if parens > 0 {
-			return nil, dsl.errors.PSR_UNEXPECTED_OPENING_PAREN()
+			return nil, errors.PSR_UNEXPECTED_OPENING_PAREN()
 		}
 		return nil, nil
-	case dsl.tokens.terminator:
+	case tokens.terminator:
 		return nil, nil
-	case dsl.tokens.assign:
+	case tokens.assign:
 		// Handle variable assignment
 		varName := strings.TrimRight(p.curr.Value, ":")
 		if varName == "" {
-			return nil, dsl.errors.PSR_ASSIGN_MISSING_NAME()
+			return nil, errors.PSR_ASSIGN_MISSING_NAME()
 		}
 		if !p.advance() {
-			return nil, dsl.errors.PSR_ASSIGN_MISSING_VALUE()
+			return nil, errors.PSR_ASSIGN_MISSING_VALUE()
 		}
 		value, err := p.parseNode()
 		if err != nil {
 			return nil, err
 		}
 		if value == nil {
-			return nil, dsl.errors.PSR_ASSIGN_MISSING_VALUE()
+			return nil, errors.PSR_ASSIGN_MISSING_VALUE()
 		}
 		return &dslNode{
-			kind:     dsl.nodes.assign,
+			kind:     nodes.assign,
 			data:     varName,
 			children: []*dslNode{value},
+			Line:     p.curr.Line,
+			Column:   p.curr.Column,
 		}, nil
 	default:
-		if p.curr.Type == dsl.tokens.integer {
+		if p.curr.Type == tokens.integer {
 			if i, err := strconv.ParseInt(p.curr.Value, 10, 64); err == nil {
 				return &dslNode{
-					kind: dsl.nodes.integer,
-					data: strconv.FormatInt(i, 10),
+					kind:   nodes.integer,
+					data:   strconv.FormatInt(i, 10),
+					Line:   p.curr.Line,
+					Column: p.curr.Column,
 				}, nil
 			}
 		}
-		if p.curr.Type == dsl.tokens.float {
+		if p.curr.Type == tokens.float {
 			if f, err := strconv.ParseFloat(p.curr.Value, 64); err == nil {
 				return &dslNode{
-					kind: dsl.nodes.float,
-					data: strconv.FormatFloat(f, 'f', -1, 64),
+					kind:   nodes.float,
+					data:   strconv.FormatFloat(f, 'f', -1, 64),
+					Line:   p.curr.Line,
+					Column: p.curr.Column,
 				}, nil
 			}
 		}
-		if p.curr.Type == dsl.tokens.boolean {
+		if p.curr.Type == tokens.boolean {
 			if b, err := strconv.ParseBool(p.curr.Value); err == nil {
 				return &dslNode{
-					kind: dsl.nodes.boolean,
-					data: strconv.FormatBool(b),
+					kind:   nodes.boolean,
+					data:   strconv.FormatBool(b),
+					Line:   p.curr.Line,
+					Column: p.curr.Column,
 				}, nil
 			}
 		}
-		if p.curr.Type == dsl.tokens.varRef {
+		if p.curr.Type == tokens.varRef {
 			base := &dslNode{
-				kind: dsl.nodes.varRef,
-				data: p.curr.Value,
+				kind:   nodes.varRef,
+				data:   p.curr.Value,
+				Line:   p.curr.Line,
+				Column: p.curr.Column,
 			}
 			// if next is an indexStart, parse indexing (can be chained)
-			for p.next != nil && p.next.Type == dsl.tokens.indexStart {
+			for p.next != nil && p.next.Type == tokens.indexStart {
 				// move to indexStart and parse
 				if !p.advance() {
 					break
 				}
-				if p.curr.Type != dsl.tokens.indexStart {
+				if p.curr.Type != tokens.indexStart {
 					break
 				}
 				idxNode, err := p.parseIndex(base)
@@ -484,36 +502,40 @@ func (p *dslParser) parseNode() (*dslNode, error) {
 			}
 			return base, nil
 		}
-		if p.next != nil && p.next.Type == dsl.tokens.callStart {
+		if p.next != nil && p.next.Type == tokens.callStart {
 			return p.parseCall()
 		}
 		// Support indexing after a completed call expression: (handled when parseCall returns and the caller sees indexStart)
 		// Allow indexing the result of a call or other expressions by handling indexStart after parseCall above
-		if p.curr.Type == dsl.tokens.indexStart {
+		if p.curr.Type == tokens.indexStart {
 			// This path occurs when an expression directly followed by [ is being parsed inside a larger context
 			// Fall back: error because we don't have a base
-			return nil, dsl.errors.PSR_EXPECTED_ARG()
+			return nil, errors.PSR_EXPECTED_ARG()
 		}
 		if !p.advance() {
 			return nil, nil
 		}
 
 		if p.prev != nil {
-			if p.prev.Type == dsl.tokens.namedArg {
+			if p.prev.Type == tokens.namedArg {
 				dsl.trimTokenRight(p.prev, "=")
 				return &dslNode{
-					kind:    dsl.nodes.arg,
+					kind:    nodes.arg,
 					data:    p.curr.Value,
 					named:   true,
 					argName: p.prev.Value,
+					Line:    p.curr.Line,
+					Column:  p.curr.Column,
 				}, nil
 
 			}
 		}
 
 		return &dslNode{
-			kind: dsl.nodes.arg,
-			data: p.curr.Value,
+			kind:   nodes.arg,
+			data:   p.curr.Value,
+			Line:   p.curr.Line,
+			Column: p.curr.Column,
 		}, nil
 	}
 }
@@ -531,25 +553,25 @@ func (p *dslParser) parseNode() (*dslNode, error) {
 // - Argument reference is invalid
 func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 	switch node.kind {
-	case dsl.nodes.argRef:
+	case nodes.argRef:
 		index, err := strconv.Atoi(strings.TrimPrefix(node.data, "$"))
 		if err != nil {
-			return nil, dsl.errors.PSR_ARG_REF_INVALID(node.data)
+			return nil, errors.PSR_ARG_REF_INVALID(node.data)
 		}
 		if index < 1 || index > len(p.args) {
-			return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(index)
+			return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(index)
 		}
 		return p.args[index-1], nil
-	case dsl.nodes.varRef:
-		val := dsl.vars.get(node.data)
+	case nodes.varRef:
+		val := p.dsl.vars.get(node.data)
 		if val == nil {
-			return nil, dsl.errors.PSR_VAR_UNDEFINED(node.data)
+			return nil, errors.PSR_VAR_UNDEFINED(node.data)
 		}
 		return val.get(), nil
-	case dsl.nodes.arg:
+	case nodes.arg:
 		// Create a temporary parser to parse the argument
 		if node.data == "" {
-			return nil, dsl.errors.PSR_INPUT_EMPTY()
+			return nil, errors.PSR_INPUT_EMPTY()
 		}
 		tokenizer := &dslTokenizer{
 			source: node.data,
@@ -588,12 +610,12 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			return node.data, nil
 		}
 		return argNode.data, nil
-	case dsl.nodes.call:
+	case nodes.call:
 		// Evaluate all child nodes first
 		args := make([]any, 0)
 		fn := dsl.funcs.get(node.data)
 		if fn == nil {
-			return nil, dsl.errors.PSR_FUNC_UNKNOWN(node.data)
+			return nil, errors.PSR_FUNC_UNKNOWN(node.data)
 		}
 		orderedArgs := make([]any, len(fn.meta.params))
 		for i, param := range fn.meta.params {
@@ -622,11 +644,11 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 					}
 				}
 				if !found {
-					return nil, dsl.errors.PSR_PARAM_UNKNOWN(child.data)
+					return nil, errors.PSR_PARAM_UNKNOWN(child.data)
 				}
 			} else {
 				if namedArgsMode {
-					return nil, dsl.errors.PSR_PARAM_STYLE_MISMATCH()
+					return nil, errors.PSR_PARAM_STYLE_MISMATCH()
 				}
 				val, err := p.evaluateNode(child)
 				if err != nil {
@@ -638,30 +660,30 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 		// Fill in positional arguments
 		for i, arg := range args {
 			if i >= len(orderedArgs) {
-				return nil, dsl.errors.PSR_PARAM_TOO_MANY(node.data)
+				return nil, errors.PSR_PARAM_TOO_MANY(node.data)
 			}
 			orderedArgs[i] = arg
 		}
-		return fn.call(orderedArgs...)
-	case dsl.nodes.assign:
+		return fn.call(p.dsl.vars, orderedArgs...)
+	case nodes.assign:
 		if len(node.children) != 1 {
-			return nil, dsl.errors.PSR_ASSIGN_INVALID()
+			return nil, errors.PSR_ASSIGN_INVALID()
 		}
 		val, err := p.evaluateNode(node.children[0])
 		if err != nil {
 			return nil, err
 		}
-		dsl.vars.set(node.data, val)
+		p.dsl.vars.set(node.data, val)
 		return val, nil
-	case dsl.nodes.str:
+	case nodes.str:
 		return node.data, nil
-	case dsl.nodes.integer:
+	case nodes.integer:
 		return strconv.ParseInt(node.data, 10, 64)
-	case dsl.nodes.float:
+	case nodes.float:
 		return strconv.ParseFloat(node.data, 64)
-	case dsl.nodes.boolean:
+	case nodes.boolean:
 		return strconv.ParseBool(node.data)
-	case dsl.nodes.slice:
+	case nodes.slice:
 		// Evaluate all children first
 		vals := make([]any, 0, len(node.children))
 		for _, child := range node.children {
@@ -828,15 +850,15 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			res = append(res, v)
 		}
 		return res, nil
-	case dsl.nodes.matrix:
+	case nodes.matrix:
 		// Evaluate all rows and infer a common type across the matrix.
 		// Rules mirror slice inference, applied to elements across rows.
 		// Row lengths must match.
 		var allVals [][]any
 		expectedLen := -1
 		for _, r := range node.children {
-			if r.kind != dsl.nodes.row {
-				return nil, dsl.errors.PSR_UNSUPPORTED_NODE_TYPE(r)
+			if r.kind != nodes.row {
+				return nil, errors.PSR_UNSUPPORTED_NODE_TYPE(r)
 			}
 			rowVals := make([]any, 0, len(r.children))
 			for _, c := range r.children {
@@ -849,7 +871,7 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			if expectedLen == -1 {
 				expectedLen = len(rowVals)
 			} else if len(rowVals) != expectedLen {
-				return nil, dsl.errors.REG_VALIDATION_OUT_OF_BOUNDS_LENGTH("matrix", "row", expectedLen, expectedLen, len(rowVals))
+				return nil, errors.REG_VALIDATION_OUT_OF_BOUNDS_LENGTH("matrix", "row", expectedLen, expectedLen, len(rowVals))
 			}
 			allVals = append(allVals, rowVals)
 		}
@@ -1035,12 +1057,36 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			anyRows = append(anyRows, rr)
 		}
 		return anyRows, nil
-	case dsl.nodes.row:
-		// Should not evaluate rows directly outside matrix context
-		return nil, dsl.errors.PSR_UNSUPPORTED_NODE_TYPE(node)
-	case dsl.nodes.index:
+	case nodes.row:
+		// Evaluate row as a slice when used as a slice element
+		rowVals := make([]any, 0, len(node.children))
+		for _, c := range node.children {
+			v, err := p.evaluateNode(c)
+			if err != nil {
+				return nil, err
+			}
+			rowVals = append(rowVals, v)
+		}
+		// Convert to []float64 if all numeric, otherwise []any
+		allNumeric := true
+		for _, v := range rowVals {
+			if _, err := dsl.toFloat64(v); err != nil {
+				allNumeric = false
+				break
+			}
+		}
+		if allNumeric && len(rowVals) > 0 {
+			res := make([]float64, 0, len(rowVals))
+			for _, v := range rowVals {
+				f, _ := dsl.toFloat64(v)
+				res = append(res, f)
+			}
+			return res, nil
+		}
+		return rowVals, nil
+	case nodes.index:
 		if len(node.children) < 2 || len(node.children) > 3 {
-			return nil, dsl.errors.PSR_ASSIGN_INVALID()
+			return nil, errors.PSR_ASSIGN_INVALID()
 		}
 		baseVal, err := p.evaluateNode(node.children[0])
 		if err != nil {
@@ -1048,7 +1094,7 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 		}
 		if mat, ok := baseVal.([][]float64); ok {
 			if len(node.children) != 3 {
-				return nil, dsl.errors.PSR_EXPECTED_ARG()
+				return nil, errors.PSR_EXPECTED_ARG()
 			}
 			rIdxVal, err := p.evaluateNode(node.children[1])
 			if err != nil {
@@ -1069,10 +1115,10 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			rIdx := int(rf)
 			cIdx := int(cf)
 			if rIdx < 0 || rIdx >= len(mat) {
-				return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(rIdx)
+				return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(rIdx)
 			}
 			if cIdx < 0 || cIdx >= len(mat[rIdx]) {
-				return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(cIdx)
+				return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(cIdx)
 			}
 			return mat[rIdx][cIdx], nil
 		}
@@ -1087,7 +1133,7 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			}
 			i := int(fidx)
 			if i < 0 || i >= len(slice) {
-				return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(i)
+				return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(i)
 			}
 			return slice[i], nil
 		}
@@ -1106,17 +1152,17 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 				}
 				i := int(fidx)
 				if i < 0 || i >= bv.Len() {
-					return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(i)
+					return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(i)
 				}
 				return bv.Index(i).Interface(), nil
 			}
 			if len(node.children) == 3 {
 				// 2D indexing: base must be slice of slices
 				if bv.Len() == 0 {
-					return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(0)
+					return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(0)
 				}
 				if bv.Type().Elem().Kind() != reflect.Slice {
-					return nil, dsl.errors.CAST_NOT_POSSIBLE("index base", "[][]T")
+					return nil, errors.CAST_NOT_POSSIBLE("index base", "[][]T")
 				}
 				rIdxVal, err := p.evaluateNode(node.children[1])
 				if err != nil {
@@ -1137,22 +1183,22 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 				r := int(rf)
 				c := int(cf)
 				if r < 0 || r >= bv.Len() {
-					return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(r)
+					return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(r)
 				}
 				row := bv.Index(r)
 				if row.Kind() != reflect.Slice {
-					return nil, dsl.errors.CAST_NOT_POSSIBLE("index base", "[][]T")
+					return nil, errors.CAST_NOT_POSSIBLE("index base", "[][]T")
 				}
 				if c < 0 || c >= row.Len() {
-					return nil, dsl.errors.PSR_ARG_REF_OUT_OF_RANGE(c)
+					return nil, errors.PSR_ARG_REF_OUT_OF_RANGE(c)
 				}
 				return row.Index(c).Interface(), nil
 			}
 		}
-		return nil, dsl.errors.CAST_NOT_POSSIBLE("index base", "slice or slice of slices")
-	case dsl.nodes.forRange:
+		return nil, errors.CAST_NOT_POSSIBLE("index base", "slice or slice of slices")
+	case nodes.forRange:
 		if len(node.children) < 2 {
-			return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+			return nil, errors.PSR_FOR_INVALID_VARS()
 		}
 
 		targetVal, err := p.evaluateNode(node.children[0])
@@ -1162,12 +1208,12 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 
 		varNames := strings.Fields(node.data)
 		if len(varNames) == 0 {
-			return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+			return nil, errors.PSR_FOR_INVALID_VARS()
 		}
 
 		target := reflect.ValueOf(targetVal)
 		if !target.IsValid() || target.Kind() != reflect.Slice {
-			return nil, dsl.errors.PSR_FOR_TARGET_NOT_ITERABLE()
+			return nil, errors.PSR_FOR_TARGET_NOT_ITERABLE()
 		}
 
 		if target.Len() == 0 {
@@ -1180,9 +1226,9 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 					row := target.Index(i)
 					for j := 0; j < row.Len(); j++ {
 						item := row.Index(j).Interface()
-						dsl.vars.set(varNames[0], float64(i))
-						dsl.vars.set(varNames[1], float64(j))
-						dsl.vars.set(varNames[2], item)
+						p.dsl.vars.set(varNames[0], float64(i))
+						p.dsl.vars.set(varNames[1], float64(j))
+						p.dsl.vars.set(varNames[2], item)
 
 						for _, stmt := range node.children[1:] {
 							_, err := p.evaluateNode(stmt)
@@ -1195,8 +1241,8 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 			} else if len(varNames) == 2 {
 				for i := 0; i < target.Len(); i++ {
 					row := target.Index(i).Interface()
-					dsl.vars.set(varNames[0], float64(i))
-					dsl.vars.set(varNames[1], row)
+					p.dsl.vars.set(varNames[0], float64(i))
+					p.dsl.vars.set(varNames[1], row)
 
 					for _, stmt := range node.children[1:] {
 						_, err := p.evaluateNode(stmt)
@@ -1206,16 +1252,16 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 					}
 				}
 			} else {
-				return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+				return nil, errors.PSR_FOR_INVALID_VARS()
 			}
 		} else {
 			if len(varNames) != 2 {
-				return nil, dsl.errors.PSR_FOR_INVALID_VARS()
+				return nil, errors.PSR_FOR_INVALID_VARS()
 			}
 			for i := 0; i < target.Len(); i++ {
 				item := target.Index(i).Interface()
-				dsl.vars.set(varNames[0], float64(i))
-				dsl.vars.set(varNames[1], item)
+				p.dsl.vars.set(varNames[0], float64(i))
+				p.dsl.vars.set(varNames[1], item)
 
 				for _, stmt := range node.children[1:] {
 					_, err := p.evaluateNode(stmt)
@@ -1228,6 +1274,6 @@ func (p *dslParser) evaluateNode(node *dslNode) (any, error) {
 
 		return nil, nil
 	default:
-		return nil, dsl.errors.PSR_UNSUPPORTED_NODE_TYPE(node)
+		return nil, errors.PSR_UNSUPPORTED_NODE_TYPE(node)
 	}
 }

@@ -14,34 +14,36 @@ type dslNode struct {
 	named    bool        // Whether this node represents a named argument (e.g. param=value)
 	argName  string      // The name of the argument if this is a named argument
 	next     *dslNode    // The next node in the sequence, used for chaining statements
+	Line     int         // Line number where node starts (1-based)
+	Column   int         // Column number where node starts (1-based)
 }
 
 func (n *dslNode) String() string {
 	typ := "any"
 	switch n.kind {
-	case dsl.nodes.call:
+	case nodes.call:
 		typ = "func"
-	case dsl.nodes.arg:
+	case nodes.arg:
 		typ = "arg"
-	case dsl.nodes.varRef:
+	case nodes.varRef:
 		typ = "var"
-	case dsl.nodes.str:
+	case nodes.str:
 		typ = "string"
-	case dsl.nodes.float:
+	case nodes.float:
 		typ = "float"
-	case dsl.nodes.integer:
+	case nodes.integer:
 		typ = "int"
-	case dsl.nodes.boolean:
+	case nodes.boolean:
 		typ = "bool"
-	case dsl.nodes.assign:
+	case nodes.assign:
 		typ = "assign"
-	case dsl.nodes.terminator:
+	case nodes.terminator:
 		typ = "end"
-	case dsl.nodes.argRef:
+	case nodes.argRef:
 		typ = "arg ref"
-	case dsl.nodes.slice:
+	case nodes.slice:
 		typ = "slice"
-	case dsl.nodes.forRange:
+	case nodes.forRange:
 		typ = "for"
 	}
 	return fmt.Sprintf("Node{Type: %s, Value: %s, Children: %v, Named: %t, ArgName: %s}", typ, n.data, n.children, n.named, n.argName)
@@ -65,13 +67,13 @@ func (n *dslNode) toTree() string {
 		}
 
 		if node.named {
-			if node.kind == dsl.nodes.call {
+			if node.kind == nodes.call {
 				fmt.Fprintf(&result, "\x1b[34m%s\x1b[0m: \x1b[33m%s\x1b[0m\n", node.argName, node.data)
 			} else {
 				fmt.Fprintf(&result, "\x1b[34m%s\x1b[0m: \x1b[32m%s\x1b[0m\n", node.argName, node.data)
 			}
 		} else {
-			if node.kind == dsl.nodes.call {
+			if node.kind == nodes.call {
 				fmt.Fprintf(&result, "\x1b[33m%s\x1b[0m\n", node.data)
 			} else {
 				fmt.Fprintf(&result, "\x1b[32m%s\x1b[0m\n", node.data)

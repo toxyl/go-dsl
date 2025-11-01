@@ -8,12 +8,15 @@ package {{ .Package }}
 
 import ({{ range .Imports }}
     {{ . | printf "%q" }}{{ end }}
+    "sync"
 )
 
-func init() {
-    // First we need to initialize our language
-    // so it becomes available in our pseudo-namespace.
-    dsl.initDSL(
+// NewLanguage creates a new isolated language instance
+func NewLanguage() *dslCollection {
+    l := &dslCollection{
+        mu: &sync.Mutex{},
+    }
+    l.initDSL(
         {{ .ID | printf "%q" }}, 
         {{ .Name | printf "%q" }}, 
         {{ .Description | printf "%q" }},
@@ -28,30 +31,30 @@ func init() {
     // If you ever need to reset the language to clear variables and functions
     // that have been added over time, you can do so by calling:
     //
-    // dsl.restoreState()
+    // l.restoreState()
     //
     // This will perform a full reset, which wipes all variables and
     // functions that have been created since the last time you called
-    // dsl.vars.storeState() and dsl.funcs.storeState().
+    // l.vars.storeState() and l.funcs.storeState().
     //
     // You can also store the current state of the language by calling:
     //
-    // dsl.storeState()
+    // l.storeState()
 
     // Register variables{{ range .VarRegistry }}
-    dsl.vars.register(
+    l.vars.register(
         {{ .Name | printf "%q" }}, {{ .Type | printf "%q" }}, {{ .Unit | printf "%q" }}, {{ .Desc | printf "%q" }},
         {{ .Min }}, {{ .Max }}, {{ .Def }},
         func() any { return {{ .OrgName }} },
         func(a any) {
-            r, _ := dsl.cast(a, {{ .Type | printf "%q" }})
+            r, _ := l.cast(a, {{ .Type | printf "%q" }})
             {{ .OrgName }} = r.({{ .Type }})
         },
     ){{ end }}
-    dsl.vars.storeState() // Store the state of variables, so we can reset the language without losing them
+    l.vars.storeState() // Store the state of variables, so we can reset the language without losing them
 
     // Register functions{{ range .FuncRegistry }}
-    dsl.funcs.register({{ .Name | printf "%q" }}, {{ .Desc | printf "%q" }},
+    l.funcs.register({{ .Name | printf "%q" }}, {{ .Desc | printf "%q" }},
         []dslParamMeta{ {{ range .Params }}
             { 
                 name: {{ .Name | printf "%q" }},
@@ -80,5 +83,11 @@ func init() {
             )
         },
     ){{ end }}
-    dsl.funcs.storeState() // Store the state of functions, so we can reset the language without losing them
+    l.funcs.storeState() // Store the state of functions, so we can reset the language without losing them
+
+    return l
+}
+
+func init() {
+    dsl = *NewLanguage()
 } 

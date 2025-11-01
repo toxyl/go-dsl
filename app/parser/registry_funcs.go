@@ -6,16 +6,20 @@ import (
 )
 
 type dslFnRegistry struct {
-	lock  *sync.Mutex
+	mu    *sync.Mutex
 	data  map[string]*dslFnType
 	state *dslRegistryState
 }
 
 func (r *dslFnRegistry) storeState() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.state.update()
 }
 
 func (r *dslFnRegistry) restoreState() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	toRemove := r.state.get()
 	for _, name := range toRemove {
 		delete(r.data, name)
@@ -24,8 +28,8 @@ func (r *dslFnRegistry) restoreState() {
 }
 
 func (r *dslFnRegistry) register(name, description string, parameters []dslParamMeta, returns []dslParamMeta, function func(...any) (any, error)) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.state.add(name, nil) // for functions, we don't need to store the function itself, just the name
 
 	// Create a local copy of the function for the registry
@@ -41,9 +45,9 @@ func (r *dslFnRegistry) register(name, description string, parameters []dslParam
 }
 
 func (r *dslFnRegistry) get(name string) *dslFnType {
-	r.lock.Lock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	fn, ok := r.data[name]
-	r.lock.Unlock()
 
 	if !ok {
 		return nil
@@ -52,12 +56,12 @@ func (r *dslFnRegistry) get(name string) *dslFnType {
 }
 
 func (r *dslFnRegistry) names() []string {
-	r.lock.Lock()
+	r.mu.Lock()
 	names := make([]string, 0, len(r.data))
 	for name := range r.data {
 		names = append(names, name)
 	}
-	r.lock.Unlock()
+	r.mu.Unlock()
 	sort.Strings(names)
 	return names
 }

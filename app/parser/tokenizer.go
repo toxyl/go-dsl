@@ -7,29 +7,31 @@ import (
 // dslTokenizer converts source code into tokens.
 // It maintains parsing state and handles lexical analysis.
 type dslTokenizer struct {
-	source string             // Source code to tokenize
-	pos    int                // Current position in source
-	token  *dslToken          // Current token being built
-	tokens []*dslToken        // All tokens found
-	state  *dslTokenizerState // Current tokenization state
+	source           string             // Source code to tokenize
+	pos              int                // Current position in source
+	token            *dslToken          // Current token being built
+	tokens           []*dslToken        // All tokens found
+	state            *dslTokenizerState // Current tokenization state
+	tokenStartLine   int                // Line where current token started
+	tokenStartColumn int                // Column where current token started
 }
 
 func (t *dslTokenizer) lex() error {
 	if len(t.tokens) == 1 {
 		token := t.tokens[0]
 		switch token.Type {
-		case dsl.tokens.assign:
-			return dsl.errors.TKN_ASSIGN_VALUE_MISSING()
-		case dsl.tokens.callStart, dsl.tokens.callEnd:
-			return dsl.errors.TKN_FUNC_INCOMPLETE()
-		case dsl.tokens.argRef, dsl.tokens.str, dsl.tokens.comment, dsl.tokens.integer, dsl.tokens.float, dsl.tokens.boolean, dsl.tokens.null:
+		case tokens.assign:
+			return errors.TKN_ASSIGN_VALUE_MISSING()
+		case tokens.callStart, tokens.callEnd:
+			return errors.TKN_FUNC_INCOMPLETE()
+		case tokens.argRef, tokens.str, tokens.comment, tokens.integer, tokens.float, tokens.boolean, tokens.null:
 			return nil
 		}
 		// this might just be a primitive, let's determine its type and return
-		token.Type = dsl.tokens.invalid
+		token.Type = tokens.invalid
 		t.determineTokenType(token)
-		if token.Type == dsl.tokens.invalid {
-			return dsl.errors.TKN_NOT_VALID(token.Value)
+		if token.Type == tokens.invalid {
+			return errors.TKN_NOT_VALID(token.Value)
 		}
 		return nil
 	}
@@ -41,66 +43,61 @@ func (t *dslTokenizer) lex() error {
 	indexes := 0
 	for i, token := range t.tokens {
 		switch token.Type {
-		case dsl.tokens.forLoop:
+		case tokens.forLoop:
 			continue
-		case dsl.tokens.done:
+		case tokens.done:
 			continue
-		case dsl.tokens.sliceEnd:
+		case tokens.sliceEnd:
 			slices--
 			inSlice--
 			if slices < 0 {
-				return dsl.errors.TKN_PAREN_MISMATCH()
+				return errors.TKN_PAREN_MISMATCH()
 			}
 			continue
-		case dsl.tokens.sliceStart:
+		case tokens.sliceStart:
 			slices++
 			inSlice++
 			continue
-		case dsl.tokens.indexStart:
+		case tokens.indexStart:
 			indexes++
 			continue
-		case dsl.tokens.indexEnd:
+		case tokens.indexEnd:
 			indexes--
 			if indexes < 0 {
-				return dsl.errors.TKN_PAREN_MISMATCH()
+				return errors.TKN_PAREN_MISMATCH()
 			}
 			continue
-		case dsl.tokens.callStart:
+		case tokens.callStart:
 			dsl.trimTokenSpace(token)
 			if dsl.containsTokenSpace(token) {
-				return dsl.errors.TKN_FUNC_WITH_SPACE()
+				return errors.TKN_FUNC_WITH_SPACE()
 			}
 			if inSlice == 0 && indexes == 0 {
 				parens++
 			}
-		case dsl.tokens.callEnd:
+		case tokens.callEnd:
 			if inSlice == 0 && indexes == 0 {
 				parens--
 				if parens < 0 {
-					return dsl.errors.TKN_PAREN_MISMATCH()
+					return errors.TKN_PAREN_MISMATCH()
 				}
 			}
-		case dsl.tokens.assign:
+		case tokens.assign:
 			if dsl.isAssignToken(token) && dsl.isAssign(token.Value[0]) {
-				return dsl.errors.TKN_ASSIGN_NAME_MISSING()
+				return errors.TKN_ASSIGN_NAME_MISSING()
 			}
 			if !t.hasTokens() || dsl.isTerminatorToken(t.tokens[i+1]) {
-				return dsl.errors.TKN_ASSIGN_VALUE_MISSING()
+				return errors.TKN_ASSIGN_VALUE_MISSING()
 			}
 		}
 	}
 	if parens != 0 {
-		return dsl.errors.TKN_PAREN_MISMATCH()
+		return errors.TKN_PAREN_MISMATCH()
 	}
 	if indexes != 0 {
-		return dsl.errors.TKN_PAREN_MISMATCH()
+		return errors.TKN_PAREN_MISMATCH()
 	}
 	return nil
-}
-
-func (t *dslTokenizer) isForLoopBody(tokenIndex int) bool {
-	// This function is no longer used with the new syntax
-	return false
 }
 
 // getTokens returns all tokens found during tokenization.
@@ -128,7 +125,7 @@ func (t *dslTokenizer) getPrevToken(i int) *dslToken {
 // String returns a formatted string representation of all tokens.
 // Used for debugging purposes.
 func (t *dslTokenizer) String() string {
-	var tokens []string
+	var res []string
 
 	for i, token := range t.tokens {
 		str := token.String()
@@ -145,20 +142,20 @@ func (t *dslTokenizer) String() string {
 			str = dsl.wrapString(str) + ` `
 		} else if dsl.isCommentToken(token) {
 			str = dsl.wrapComment(str) + ` `
-		} else if dsl.isAnyToken(token, dsl.tokens.argValue, dsl.tokens.float, dsl.tokens.integer, dsl.tokens.boolean, dsl.tokens.null) {
+		} else if dsl.isAnyToken(token, tokens.argValue, tokens.float, tokens.integer, tokens.boolean, tokens.null) {
 			str = str + ` `
 		} else if dsl.isCallStartToken(token) && prev != nil && dsl.isCallEndToken(prev) {
-			dsl.setLastString(&tokens, ") ") // adds padding when two or more function calls are used in sequence as arguments (e.g. `add(sub(5 3) sub(3 5))`)
+			dsl.setLastString(&res, ") ") // adds padding when two or more function calls are used in sequence as arguments (e.g. `add(sub(5 3) sub(3 5))`)
 		} else if dsl.isCallEndToken(token) && prev != nil && dsl.isNotCallStartToken(prev) {
-			dsl.trimLastStringRight(&tokens, " ") // removes padding after last argument
-		} else if dsl.isCallStartToken(token) && prev != nil && dsl.isAnyToken(prev, dsl.tokens.varRef, dsl.tokens.integer, dsl.tokens.float, dsl.tokens.boolean, dsl.tokens.str, dsl.tokens.comment, dsl.tokens.null, dsl.tokens.argValue) {
-			dsl.appendLastString(&tokens, " ") // adds before function call
-		} else if dsl.isTerminatorToken(token) && len(tokens) > 0 {
-			dsl.trimLastStringRight(&tokens, " ")
+			dsl.trimLastStringRight(&res, " ") // removes padding after last argument
+		} else if dsl.isCallStartToken(token) && prev != nil && dsl.isAnyToken(prev, tokens.varRef, tokens.integer, tokens.float, tokens.boolean, tokens.str, tokens.comment, tokens.null, tokens.argValue) {
+			dsl.appendLastString(&res, " ") // adds before function call
+		} else if dsl.isTerminatorToken(token) && len(res) > 0 {
+			dsl.trimLastStringRight(&res, " ")
 		}
-		tokens = append(tokens, str)
+		res = append(res, str)
 	}
-	return dsl.join(tokens)
+	return dsl.join(res)
 }
 
 func (t *dslTokenizer) hasTokens() bool {
@@ -173,6 +170,27 @@ func (t *dslTokenizer) hasNext() bool {
 	return t.pos < len(t.source)-1
 }
 
+// updatePosition updates line/column tracking based on the character without incrementing pos.
+func (t *dslTokenizer) updatePosition(c byte) {
+	switch c {
+	case '\n':
+		t.state.Line++
+		t.state.Column = 1
+	case '\r':
+		// For \r\n sequences, the \n will handle the line increment
+		// Just reset column for standalone \r
+		t.state.Column = 1
+	default:
+		t.state.Column++
+	}
+}
+
+// advancePos updates line/column tracking based on the character and increments position.
+func (t *dslTokenizer) advancePos(c byte) {
+	t.updatePosition(c)
+	t.pos++
+}
+
 // addToken adds a new token to the token stream.
 func (t *dslTokenizer) addToken(token dslToken) {
 	if dsl.isEmpty(token.Value) || dsl.isNewline(token.Value) {
@@ -184,6 +202,10 @@ func (t *dslTokenizer) addToken(token dslToken) {
 		dsl.replaceInToken(&token, "\t", " ")
 		dsl.trimTokenSpace(&token)
 	}
+
+	// Set token position
+	token.Line = t.tokenStartLine
+	token.Column = t.tokenStartColumn
 
 	t.tokens = append(t.tokens, &token)
 }
@@ -207,17 +229,20 @@ func (t *dslTokenizer) addTokenAndSetNext(token *dslToken, typ dslTokenType) {
 
 	t.addToken(*token)
 	(*token) = *dsl.newToken("", typ)
+	// Capture start position for next token
+	t.tokenStartLine = t.state.Line
+	t.tokenStartColumn = t.state.Column
 }
 
 // addCallEndToken handles the end of a function call.
 // Returns true if processing should continue, false if it should stop.
 func (t *dslTokenizer) addCallEndToken(token *dslToken) (cont bool, err error) {
-	t.addTokenAndSetNext(token, dsl.tokens.callEnd)
+	t.addTokenAndSetNext(token, tokens.callEnd)
 	token.Value = ")"
 	t.state.argValueEnd()
 	t.state.parenClose()
 	if t.state.parensMismatch() {
-		return false, dsl.errors.TKN_PAREN_MISMATCH()
+		return false, errors.TKN_PAREN_MISMATCH()
 	}
 	if t.state.notInInParens() {
 		// If we're inside a slice or index, do NOT end the statement here.
@@ -228,7 +253,7 @@ func (t *dslTokenizer) addCallEndToken(token *dslToken) (cont bool, err error) {
 		}
 		t.state.callEnd()
 		t.state.statementEnd()
-		t.addTokenAndSetNext(token, dsl.tokens.terminator)
+		t.addTokenAndSetNext(token, tokens.terminator)
 		return true, nil
 	}
 	t.state.argValueStart()
@@ -241,30 +266,30 @@ func (t *dslTokenizer) determineTokenType(token *dslToken) {
 
 	// Keywords must be checked unconditionally
 	if dsl.equals(v, "for") {
-		token.Type = dsl.tokens.forLoop
+		token.Type = tokens.forLoop
 		return
 	}
 	if dsl.equals(v, "done") {
-		token.Type = dsl.tokens.done
+		token.Type = tokens.done
 		return
 	}
 
 	if dsl.isArgValueToken(token) || dsl.isInvalidToken(token) {
 		switch {
 		case dsl.equals(v, "true"), dsl.equals(v, "false"):
-			token.Type = dsl.tokens.boolean
+			token.Type = tokens.boolean
 		case dsl.equals(v, "nil"):
-			token.Type = dsl.tokens.null
+			token.Type = tokens.null
 		case dsl.contains(v, "."):
-			token.Type = dsl.tokens.float
+			token.Type = tokens.float
 		case v == "":
-			token.Type = dsl.tokens.str
+			token.Type = tokens.str
 		default:
 			// this might be an int, or it's a variable, so let's check
 			if dsl.onlyDigits(v) {
-				token.Type = dsl.tokens.integer
+				token.Type = tokens.integer
 			} else {
-				token.Type = dsl.tokens.varRef
+				token.Type = tokens.varRef
 			}
 		}
 	}
@@ -274,10 +299,11 @@ func (t *dslTokenizer) determineTokenType(token *dslToken) {
 func (t *dslTokenizer) handleString() error {
 	// Start of string
 	t.state.stringStart()
-	t.token.Type = dsl.tokens.str
+	t.token.Type = tokens.str
 
 	// Skip the opening quote
-	t.pos++
+	c := t.source[t.pos]
+	t.advancePos(c)
 
 	for t.hasCharacterLeft() {
 		c := t.source[t.pos]
@@ -302,14 +328,14 @@ func (t *dslTokenizer) handleString() error {
 				t.token.append(c)
 			}
 			t.state.escapeEnd()
-			t.pos++
+			t.advancePos(c)
 			continue
 		}
 
 		// Start escape
 		if dsl.isEscape(c) {
 			t.state.escapeStart()
-			t.pos++
+			t.advancePos(c)
 			continue
 		}
 
@@ -317,25 +343,25 @@ func (t *dslTokenizer) handleString() error {
 		if dsl.isString(c) && t.state.notInEscape() {
 			t.state.stringEnd()
 			t.state.escapeEnd()
-			t.addTokenAndSetNext(t.token, dsl.tokens.argValue)
-			t.pos++
+			t.addTokenAndSetNext(t.token, tokens.argValue)
+			t.advancePos(c)
 			return nil
 		}
 
 		// Add character to token value
 		t.token.append(c)
-		t.pos++
+		t.advancePos(c)
 	}
 
 	// If we reach here, we hit EOF before finding the closing quote
-	return dsl.errors.TKN_UNTERMINATED_STRING(t.pos)
+	return errors.TKN_UNTERMINATED_STRING(t.pos)
 }
 
 // handleNamedArg processes named arguments in function calls, handling both the argument name
 // and its value, while maintaining proper state for argument processing.
 func (t *dslTokenizer) handleNamedArg(token *dslToken) *dslToken {
 	if dsl.isCallStartToken(token) {
-		t.addTokenAndSetNext(token, dsl.tokens.argValue)
+		t.addTokenAndSetNext(token, tokens.argValue)
 		t.pos++
 		return token
 	}
@@ -346,7 +372,7 @@ func (t *dslTokenizer) handleNamedArg(token *dslToken) *dslToken {
 		token = t.token
 	}
 
-	token.Type = dsl.tokens.namedArg
+	token.Type = tokens.namedArg
 	dsl.trimToken(token, " ")
 	dsl.appendToken(token, "=")
 
@@ -358,7 +384,7 @@ func (t *dslTokenizer) handleNamedArg(token *dslToken) *dslToken {
 	if needToGoBack {
 		t.tokens = t.tokens[:len(t.tokens)-1]
 	}
-	t.addTokenAndSetNext(token, dsl.tokens.argValue)
+	t.addTokenAndSetNext(token, tokens.argValue)
 
 	// Restore inArgValue state after processing the named argument
 	t.state.setArgValue(wasInArgValue)
@@ -370,20 +396,20 @@ func (t *dslTokenizer) handleNamedArg(token *dslToken) *dslToken {
 // for unterminated strings, comments, functions, and arguments, and resetting the
 // statement state for the next statement.
 func (t *dslTokenizer) handleTerminator() error {
-	t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.invalid)
+	t.addTokenAndSetNext(dsl.newTerminatorToken(), tokens.invalid)
 	t.state.statementStart()
 	t.state.assignEnd()
 	if t.state.inString() {
-		return dsl.errors.TKN_UNTERMINATED_STRING(t.pos)
+		return errors.TKN_UNTERMINATED_STRING(t.pos)
 	}
 	if t.state.inComment() {
-		return dsl.errors.TKN_UNTERMINATED_COMMENT(t.pos)
+		return errors.TKN_UNTERMINATED_COMMENT(t.pos)
 	}
 	if t.state.inCall() {
-		return dsl.errors.TKN_UNTERMINATED_FUNC(t.pos)
+		return errors.TKN_UNTERMINATED_FUNC(t.pos)
 	}
 	if t.state.inArgValue() {
-		return dsl.errors.TKN_UNTERMINATED_ARG(t.pos)
+		return errors.TKN_UNTERMINATED_ARG(t.pos)
 	}
 	t.pos++
 	return nil
@@ -398,9 +424,9 @@ func (t *dslTokenizer) handleComment(c byte, token *dslToken) bool {
 		t.state.commentToggle()
 		if t.state.inCode() { // comment token finished
 			t.token.append(c)
-			t.token.Type = dsl.tokens.comment
+			t.token.Type = tokens.comment
 			dsl.trimToken(t.token, "# ")
-			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			t.addTokenAndSetNext(token, tokens.invalid)
 			t.pos++
 			return true
 		}
@@ -452,7 +478,7 @@ func (t *dslTokenizer) handleCallWithoutArgs(token *dslToken) error {
 		t.pos++
 		return nil
 	}
-	t.addTokenAndSetNext(token, dsl.tokens.invalid)
+	t.addTokenAndSetNext(token, tokens.invalid)
 	t.pos++
 	return nil
 }
@@ -469,7 +495,7 @@ func (t *dslTokenizer) isTerminator() bool {
 // for the argument reference. Returns an error if the argument number is invalid
 // or if the reference appears in an invalid context (e.g., inside a string).
 func (t *dslTokenizer) handleArgRef() error {
-	// Skip the '$' character
+	// Skip the '$' character (already tracked in main loop)
 	t.pos++
 
 	// Collect the argument number
@@ -478,31 +504,31 @@ func (t *dslTokenizer) handleArgRef() error {
 		c := t.source[t.pos]
 		if dsl.isDigit(c) {
 			argNum += string(c)
-			t.pos++
+			t.advancePos(c)
 		} else {
 			break
 		}
 	}
 
 	if argNum == "" {
-		return dsl.errors.TKN_INVALID_ARG_REF(t.pos, "missing number after $")
+		return errors.TKN_INVALID_ARG_REF(t.pos, "missing number after $")
 	}
 
-	t.token.Type = dsl.tokens.argRef
+	t.token.Type = tokens.argRef
 	t.token.Value = "$" + argNum
 
 	// If we're in a function call or after a variable assignment, treat this as a value
 	if t.state.notInCall() {
-		t.addTokenAndSetNext(t.token, dsl.tokens.argValue)
+		t.addTokenAndSetNext(t.token, tokens.argValue)
 	} else if t.state.inAssign() {
 		// possible but ends the statement
 		if t.hasCharacterLeft() {
-			t.addTokenAndSetNext(t.token, dsl.tokens.terminator)
-			t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.terminator)
+			t.addTokenAndSetNext(t.token, tokens.terminator)
+			t.addTokenAndSetNext(dsl.newTerminatorToken(), tokens.terminator)
 		}
-		t.addTokenAndSetNext(t.token, dsl.tokens.invalid)
+		t.addTokenAndSetNext(t.token, tokens.invalid)
 	} else {
-		t.addTokenAndSetNext(t.token, dsl.tokens.invalid)
+		t.addTokenAndSetNext(t.token, tokens.invalid)
 	}
 	return nil
 }
@@ -514,6 +540,10 @@ func (t *dslTokenizer) tokenize() error {
 		token = t.token
 	)
 
+	// Initialize token start position
+	t.tokenStartLine = t.state.Line
+	t.tokenStartColumn = t.state.Column
+
 	for t.hasCharacterLeft() {
 		if t.isTerminator() {
 			if err := t.handleTerminator(); err != nil {
@@ -523,6 +553,12 @@ func (t *dslTokenizer) tokenize() error {
 		}
 
 		c := t.source[t.pos]
+		// Capture token start position if token is empty
+		if token.Value == "" {
+			t.tokenStartLine = t.state.Line
+			t.tokenStartColumn = t.state.Column
+		}
+		t.updatePosition(c)
 
 		// Check for argument reference
 		if dsl.isArgRef(c) && t.state.notInString() && t.state.inCode() {
@@ -559,7 +595,7 @@ func (t *dslTokenizer) tokenize() error {
 		if t.state.inAssign() {
 			if dsl.isWhitespace(c) {
 				t.pos++
-				continue // eat all whitespace following the variable assignment
+				continue // eat all whitespace following the variable assignment (already tracked)
 			}
 			t.state.assignEnd()
 		}
@@ -571,18 +607,18 @@ func (t *dslTokenizer) tokenize() error {
 				// we finished the last element, add it if it exists
 				dsl.trimTokenSpace(t.token)
 				if dsl.isNotEmptyToken(token) {
-					t.addTokenAndSetNext(token, dsl.tokens.argValue)
+					t.addTokenAndSetNext(token, tokens.argValue)
 				}
 				t.state.sliceClose()
 				// Disabled for for loops
 				// if t.state.slices < 0 {
-				// 	return dsl.errors.TKN_PAREN_MISMATCH()
+				// 	return errors.TKN_PAREN_MISMATCH()
 				// }
-				t.addTokenAndSetNext(dsl.newToken("}", dsl.tokens.sliceEnd), dsl.tokens.invalid)
+				t.addTokenAndSetNext(dsl.newToken("}", tokens.sliceEnd), tokens.invalid)
 				t.state.argValueEnd()
 				if t.state.notInSlice() && t.state.notInCall() {
 					t.state.statementEnd()
-					t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.terminator)
+					t.addTokenAndSetNext(dsl.newTerminatorToken(), tokens.terminator)
 				}
 				t.pos++
 				continue
@@ -592,7 +628,7 @@ func (t *dslTokenizer) tokenize() error {
 			if dsl.isWhitespace(c) {
 				dsl.trimTokenSpace(t.token)
 				if dsl.isNotEmptyToken(token) {
-					t.addTokenAndSetNext(token, dsl.tokens.argValue)
+					t.addTokenAndSetNext(token, tokens.argValue)
 				}
 				t.pos++
 				continue
@@ -603,11 +639,11 @@ func (t *dslTokenizer) tokenize() error {
 		if t.state.waitingForArgs() {
 			// check if it's a function call without args
 			if dsl.isEmptyToken(token) && dsl.isCallEnd(c) {
-				if t.getPrevToken(len(t.tokens)).Type == dsl.tokens.namedArg {
+				if t.getPrevToken(len(t.tokens)).Type == tokens.namedArg {
 					// special case where a function has a named argument that is an empty string
 					t.determineTokenType(token)
 					t.tokens = append(t.tokens, token)
-					t.tokens = append(t.tokens, dsl.newToken(")", dsl.tokens.callEnd))
+					t.tokens = append(t.tokens, dsl.newToken(")", tokens.callEnd))
 					t.pos++
 					continue
 				} else {
@@ -626,7 +662,7 @@ func (t *dslTokenizer) tokenize() error {
 					t.pos++
 					continue
 				}
-				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				t.addTokenAndSetNext(token, tokens.argValue)
 				t.pos++
 				continue
 			}
@@ -640,7 +676,7 @@ func (t *dslTokenizer) tokenize() error {
 			// check if it's an argument separator
 			if dsl.isWhitespace(c) {
 				dsl.trimTokenSpace(t.token)
-				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				t.addTokenAndSetNext(token, tokens.argValue)
 				t.pos++
 				continue
 			}
@@ -652,17 +688,18 @@ func (t *dslTokenizer) tokenize() error {
 		if dsl.isAssign(c) {
 			t.token.append(c)
 			if t.state.inAssign() {
-				return dsl.errors.TKN_ASSIGN_UNEXPECTED(t.pos)
+				return errors.TKN_ASSIGN_UNEXPECTED(t.pos)
 			}
 			t.state.assignStart()
-			token.Type = dsl.tokens.assign
+			token.Type = tokens.assign
 			if len(t.tokens) > 0 {
-				t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.assign)
+				t.addTokenAndSetNext(dsl.newTerminatorToken(), tokens.assign)
 			}
-			t.addTokenAndSetNext(token, dsl.tokens.argValue)
+			t.addTokenAndSetNext(token, tokens.argValue)
 			t.pos++
 			for t.hasNext() && dsl.isWhitespace(t.source[t.pos]) {
-				t.pos++
+				c2 := t.source[t.pos]
+				t.advancePos(c2)
 			}
 			continue
 		}
@@ -671,8 +708,8 @@ func (t *dslTokenizer) tokenize() error {
 		// for function calls, i.e. "func(x)"
 		if dsl.isCallStart(c) {
 			t.token.append(c)
-			token.Type = dsl.tokens.callStart
-			t.addTokenAndSetNext(token, dsl.tokens.argValue)
+			token.Type = tokens.callStart
+			t.addTokenAndSetNext(token, tokens.argValue)
 			t.state.parenOpen()
 			t.state.callStart()
 			t.state.argValueStart()
@@ -689,7 +726,7 @@ func (t *dslTokenizer) tokenize() error {
 				t.pos++
 				continue
 			}
-			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			t.addTokenAndSetNext(token, tokens.invalid)
 			t.pos++
 			continue
 		}
@@ -698,8 +735,8 @@ func (t *dslTokenizer) tokenize() error {
 		// for slices, i.e. "{ 1 2 3 }"
 		if dsl.isSliceStart(c) && t.state.notInString() && t.state.inCode() && t.state.notInSlice() {
 			t.token.append(c)
-			token.Type = dsl.tokens.sliceStart
-			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			token.Type = tokens.sliceStart
+			t.addTokenAndSetNext(token, tokens.invalid)
 			t.state.sliceOpen()
 			t.state.argValueStart()
 			t.pos++
@@ -711,9 +748,9 @@ func (t *dslTokenizer) tokenize() error {
 			// finalize any pending value as element of current row
 			dsl.trimTokenSpace(t.token)
 			if dsl.isNotEmptyToken(token) {
-				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				t.addTokenAndSetNext(token, tokens.argValue)
 			}
-			t.addTokenAndSetNext(dsl.newToken("<", dsl.tokens.rowStart), dsl.tokens.invalid)
+			t.addTokenAndSetNext(dsl.newToken("<", tokens.rowStart), tokens.invalid)
 			t.state.argValueStart()
 			t.pos++
 			continue
@@ -723,9 +760,9 @@ func (t *dslTokenizer) tokenize() error {
 		if dsl.isRowEnd(c) && t.state.notInString() && t.state.inCode() && t.state.inSlice() {
 			dsl.trimTokenSpace(t.token)
 			if dsl.isNotEmptyToken(token) {
-				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				t.addTokenAndSetNext(token, tokens.argValue)
 			}
-			t.addTokenAndSetNext(dsl.newToken(">", dsl.tokens.rowEnd), dsl.tokens.invalid)
+			t.addTokenAndSetNext(dsl.newToken(">", tokens.rowEnd), tokens.invalid)
 			t.state.argValueEnd()
 			t.pos++
 			continue
@@ -738,12 +775,12 @@ func (t *dslTokenizer) tokenize() error {
 			dsl.trimTokenSpace(t.token)
 			if dsl.isNotEmptyToken(token) {
 				t.determineTokenType(token)
-				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				t.addTokenAndSetNext(token, tokens.argValue)
 			}
 			// emit indexStart token using current token
 			t.token.append(c)
-			token.Type = dsl.tokens.indexStart
-			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			token.Type = tokens.indexStart
+			t.addTokenAndSetNext(token, tokens.invalid)
 			t.state.indexOpen()
 			t.state.argValueStart()
 			t.pos++
@@ -755,16 +792,16 @@ func (t *dslTokenizer) tokenize() error {
 			// we finished the last index token, add it if it exists
 			dsl.trimTokenSpace(t.token)
 			if dsl.isNotEmptyToken(token) {
-				t.addTokenAndSetNext(token, dsl.tokens.argValue)
+				t.addTokenAndSetNext(token, tokens.argValue)
 			}
 			// emit indexEnd token
-			t.addToken(*dsl.newToken("]", dsl.tokens.indexEnd))
+			t.addToken(*dsl.newToken("]", tokens.indexEnd))
 			t.state.argValueEnd()
 			t.state.indexClose()
 			// If we're not inside another index/call/slice and not in parens, end the statement
 			if t.state.notInIndex() && t.state.notInCall() && t.state.notInSlice() && t.state.notInInParens() {
 				t.state.statementEnd()
-				t.addTokenAndSetNext(dsl.newTerminatorToken(), dsl.tokens.terminator)
+				t.addTokenAndSetNext(dsl.newTerminatorToken(), tokens.terminator)
 			}
 			t.pos++
 			continue
@@ -780,9 +817,9 @@ func (t *dslTokenizer) tokenize() error {
 			}
 			t.state.sliceClose()
 			if t.state.slices < 0 {
-				return dsl.errors.TKN_PAREN_MISMATCH()
+				return errors.TKN_PAREN_MISMATCH()
 			}
-			t.addToken(*dsl.newToken("}", dsl.tokens.sliceEnd))
+			t.addToken(*dsl.newToken("}", tokens.sliceEnd))
 			t.state.argValueEnd()
 			t.pos++
 			continue
@@ -790,8 +827,8 @@ func (t *dslTokenizer) tokenize() error {
 
 		if dsl.isTerminator(c) {
 			t.token.append(c)
-			t.token.Type = dsl.tokens.terminator
-			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			t.token.Type = tokens.terminator
+			t.addTokenAndSetNext(token, tokens.invalid)
 			t.pos++
 			continue
 		}
@@ -804,9 +841,9 @@ func (t *dslTokenizer) tokenize() error {
 			}
 			// Handle done keyword
 			if token.Value == "done" {
-				token.Type = dsl.tokens.done
+				token.Type = tokens.done
 			}
-			t.addTokenAndSetNext(token, dsl.tokens.invalid)
+			t.addTokenAndSetNext(token, tokens.invalid)
 			t.pos++
 			continue
 		}

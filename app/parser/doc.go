@@ -303,8 +303,16 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 					"name":  "keyword.control.for",
 				},
 				{
+					"match": "\\binclude\\b",
+					"name":  "keyword.control.include",
+				},
+				{
 					"match": "\\bdone\\b",
 					"name":  "keyword.control.done",
+				},
+				{
+					"match": "\\bmacro\\b",
+					"name":  "keyword.control.macro",
 				},
 				{
 					"name":  "constant.numeric",
@@ -402,7 +410,7 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 				"description": "Create a string literal",
 			},
 			"Comment": map[string]any{
-				"prefix":      "//",
+				"prefix":      "#",
 				"body":        []string{"# ${1:comment} #"},
 				"description": "Create a comment",
 			},
@@ -410,6 +418,16 @@ func (dsl *dslCollection) GetLanguageDefinition() (map[string]any, error) {
 				"prefix":      "for",
 				"body":        []string{"for ${1:listName}[${2:i} ${3:item}]", "\t${4:# body #}", "done"},
 				"description": "Create a for loop",
+			},
+			"Include": map[string]any{
+				"prefix":      "include",
+				"body":        []string{"include \"${1:path/to/file}\""},
+				"description": "Include another script file",
+			},
+			"Macro": map[string]any{
+				"prefix":      "macro",
+				"body":        []string{"macro ${1:functionName}(${2:arg1}) ${3:# body #};"},
+				"description": "A simple macro that is substituted by the preprocessor. Note that macros do not have a separate scope.",
 			},
 		},
 		"completions": map[string]any{

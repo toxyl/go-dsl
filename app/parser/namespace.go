@@ -202,6 +202,12 @@ func dslError(fmtStr string, args ...any) error {
 	return fmt.Errorf(fmtStr, args...)
 }
 
+type dslMacro struct {
+	name   string
+	params []string
+	body   string
+}
+
 // dslCollection is a helper struct to group functions, variables and constants
 // under a simple prefix which helps to avoid name collisions with
 // existing package level functions / variables / consts.
@@ -217,6 +223,7 @@ type dslCollection struct {
 	parser      *dslParser
 	vars        *dslVarRegistry
 	funcs       *dslFnRegistry
+	macros      map[string]*dslMacro
 }
 
 var dsl = dslCollection{

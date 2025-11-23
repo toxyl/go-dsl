@@ -490,7 +490,7 @@ func (dsl *dslCollection) shell() {
 		}
 
 		// Execute the input
-		result, err := dsl.run(input, debugMode)
+		result, err := dsl.run(input, "", nil, debugMode)
 		if err != nil {
 			fmt.Printf("\x1b[31mError: %v\x1b[0m\n", err)
 			continue

@@ -704,7 +704,7 @@ x`, []any{}, &dslResult{70.0, nil}, false),
 		for _, tt := range tests {
 			dsl.restoreState()
 			t.Run(tt.name, func(t *testing.T) {
-				got, err := dsl.run(tt.script, false, tt.args...)
+				got, err := dsl.run(tt.script, "", nil, false, tt.args...)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
 		}
@@ -742,7 +742,7 @@ func TestBasicExpressions(t *testing.T) {
 		for _, tt := range tests {
 			dsl.restoreState()
 			t.Run(tt.name, func(t *testing.T) {
-				got, err := dsl.run(tt.script, false, tt.args...)
+				got, err := dsl.run(tt.script, "", nil, false, tt.args...)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
 		}
@@ -1603,7 +1603,7 @@ func TestParser(t *testing.T) {
 		for _, tt := range tests {
 			dsl.restoreState()
 			t.Run(tt.name, func(t *testing.T) {
-				got, err := dsl.run(tt.script, false, tt.args...)
+				got, err := dsl.run(tt.script, "", nil, false, tt.args...)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
 		}
@@ -1650,7 +1650,7 @@ func TestImageProcessing(t *testing.T) {
 			}
 			processedImages[outputPath] = struct{}{}
 			script := fmt.Sprintf(filter.script, inputPathBottom, outputPath)
-			_, err := dsl.run(script, false)
+			_, err := dsl.run(script, "", nil, false)
 			if err != nil {
 				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, filter.name, err)
 			}
@@ -1679,7 +1679,7 @@ func TestImageProcessing(t *testing.T) {
 			}
 			processedImages[outputPath] = struct{}{}
 			script := fmt.Sprintf(filter.script, inputPathBottom, inputPathTop, outputPath)
-			_, err := dsl.run(script, false)
+			_, err := dsl.run(script, "", nil, false)
 			if err != nil {
 				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, filter.name, err)
 			}
@@ -1712,7 +1712,7 @@ func TestImageProcessing(t *testing.T) {
 			}
 			processedImages[outputPath] = struct{}{}
 			script := fmt.Sprintf(combo.script, inputPathBottom, outputPath)
-			_, err := dsl.run(script, false)
+			_, err := dsl.run(script, "", nil, false)
 			if err != nil {
 				t.Errorf("Failed to process %s with %s: %v", baseNameBottom, combo.name, err)
 			}
@@ -1739,7 +1739,7 @@ func TestImageProcessing(t *testing.T) {
 			}
 			processedImages[outputPath] = struct{}{}
 			script := fmt.Sprintf(errCase.script, inputPathBottom, outputPath)
-			_, err := dsl.run(script, false)
+			_, err := dsl.run(script, "", nil, false)
 			if err == nil {
 				t.Errorf("Expected error for %s with %s but got none", baseNameBottom, errCase.name)
 			}
@@ -1811,7 +1811,7 @@ func TestSlice(t *testing.T) {
 		for _, tt := range tests {
 			dsl.restoreState()
 			t.Run(tt.name, func(t *testing.T) {
-				got, err := dsl.run(tt.script, false, tt.args...)
+				got, err := dsl.run(tt.script, "", nil, false, tt.args...)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
 		}
@@ -1847,7 +1847,7 @@ func TestSliceIndexing(t *testing.T) {
 		for _, tt := range tests {
 			dsl.restoreState()
 			t.Run(tt.name, func(t *testing.T) {
-				got, err := dsl.run(tt.script, false, tt.args...)
+				got, err := dsl.run(tt.script, "", nil, false, tt.args...)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
 		}
@@ -1878,7 +1878,7 @@ func TestMatrixLiteralsAndIndexing(t *testing.T) {
 		for _, tt := range tests {
 			dsl.restoreState()
 			t.Run(tt.name, func(t *testing.T) {
-				got, err := dsl.run(tt.script, false)
+				got, err := dsl.run(tt.script, "", nil, false)
 				testResult(t, tt.name, tt.want, tt.wantErr, got, err)
 			})
 		}

@@ -47,7 +47,23 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 				}
 				return result, nil
 			}
-			// Slice-to-slice conversions (except []any) are not allowed
+			if targetType == "[][]any" {
+				// Convert [][]interface{} to [][]any
+				val := reflect.ValueOf(value)
+				result := make([][]any, val.Len())
+				for i := 0; i < val.Len(); i++ {
+					row := val.Index(i)
+					if row.Kind() == reflect.Slice {
+						rowResult := make([]any, row.Len())
+						for j := 0; j < row.Len(); j++ {
+							rowResult[j] = row.Index(j).Interface()
+						}
+						result[i] = rowResult
+					}
+				}
+				return result, nil
+			}
+			// Slice-to-slice conversions (except []any and [][]any) are not allowed
 			return nil, errors.CAST_NOT_POSSIBLE(reflect.TypeOf(value).String(), targetType)
 		}
 	}
@@ -81,9 +97,40 @@ func (dsl *dslCollection) cast(value any, targetType string) (any, error) {
 		return castSelfOnly(value, targetType, "FillStyle")
 	case TextStyle:
 		return castSelfOnly(value, targetType, "TextStyle")
-	// TODO: NEW TYPES: add additional types
+		// TODO: NEW TYPES: add additional types
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string:
 	default:
+		// Check if value is a slice type that wasn't handled above
+		valType := reflect.TypeOf(value)
+		if valType != nil && valType.Kind() == reflect.Slice {
+			// If targetType is also a slice, try to handle it
+			if strings.HasPrefix(targetType, "[]") {
+				// This should have been caught earlier, but handle it here as fallback
+				if targetType == "[]any" {
+					val := reflect.ValueOf(value)
+					result := make([]any, val.Len())
+					for i := 0; i < val.Len(); i++ {
+						result[i] = val.Index(i).Interface()
+					}
+					return result, nil
+				}
+				if targetType == "[][]any" {
+					val := reflect.ValueOf(value)
+					result := make([][]any, val.Len())
+					for i := 0; i < val.Len(); i++ {
+						row := val.Index(i)
+						if row.Kind() == reflect.Slice {
+							rowResult := make([]any, row.Len())
+							for j := 0; j < row.Len(); j++ {
+								rowResult[j] = row.Index(j).Interface()
+							}
+							result[i] = rowResult
+						}
+					}
+					return result, nil
+				}
+			}
+		}
 		// If we get here the type is not supported
 		return nil, errors.UNSUPPORTED_SOURCE_TYPE(value)
 	}

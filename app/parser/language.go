@@ -260,13 +260,13 @@ func (dsl *dslCollection) expandMacros(script string) (string, error) {
 // It handles parsing, execution, and error handling.
 // The debug parameter enables verbose output of the execution process.
 // The args parameter allows passing arguments to the script.
-func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResult, error) {
+func (dsl *dslCollection) run(script, baseDir string, replacements map[string]string, debug bool, args ...any) (*dslResult, error) {
 	dsl.mu.Lock()
 	defer dsl.mu.Unlock()
 
 	dsl.macros = make(map[string]*dslMacro)
 
-	script, err := dsl.expandIncludes(script, "", nil)
+	script, err := dsl.expandIncludes(script, baseDir, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -279,6 +279,24 @@ func (dsl *dslCollection) run(script string, debug bool, args ...any) (*dslResul
 	script, err = dsl.expandMacros(script)
 	if err != nil {
 		return nil, err
+	}
+
+	for s, r := range replacements {
+		pattern := regexp.MustCompile(`\b` + s + `\b`)
+		var result strings.Builder
+		lastIdx := 0
+		for _, match := range pattern.FindAllStringIndex(script, -1) {
+			result.WriteString(script[lastIdx:match[0]])
+			after := strings.TrimSpace(script[match[1]:])
+			if len(after) > 0 && after[0] == ':' {
+				result.WriteString(script[match[0]:match[1]])
+			} else {
+				result.WriteString(r)
+			}
+			lastIdx = match[1]
+		}
+		result.WriteString(script[lastIdx:])
+		script = result.String()
 	}
 
 	dsl.trimSpace(&script)

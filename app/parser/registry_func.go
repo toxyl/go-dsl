@@ -99,7 +99,7 @@ func (f *dslFnType) call(vars *dslVarRegistry, args ...any) (any, error) {
 		}
 
 		// Handle type conversions
-		if f.meta.params[i].typ != "" {
+		if f.meta.params[i].typ != "" && f.meta.params[i].typ != "any" {
 			// Check if types already match exactly before casting
 			argType := reflect.TypeOf(callArgs[i])
 			if argType != nil && argType.String() == f.meta.params[i].typ {
